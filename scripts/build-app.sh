@@ -1,11 +1,19 @@
 #!/bin/sh
 set -eu
-[ "${1:-}" = "--probe" ] || { echo 'Usage: scripts/build-app.sh --probe' >&2; exit 2; }
 cd "$(dirname "$0")/.."
-swift build --build-system native --product IslandProbe
+case "${1:-}" in
+  '') product=IslandMac; plist=Resources/App-Info.plist ;;
+  --probe) product=IslandProbe; plist=Resources/Probe-Info.plist ;;
+  *) echo 'Usage: scripts/build-app.sh [--probe]' >&2; exit 2 ;;
+esac
+swift build --build-system native --product "$product"
 bin_dir=$(swift build --build-system native --show-bin-path)
-app=.build/apps/IslandProbe.app
-mkdir -p "$app/Contents/MacOS"
-cp "$bin_dir/IslandProbe" "$app/Contents/MacOS/IslandProbe"
-cp Resources/Probe-Info.plist "$app/Contents/Info.plist"
+app=".build/apps/$product.app"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+cp "$bin_dir/$product" "$app/Contents/MacOS/$product"
+cp "$plist" "$app/Contents/Info.plist"
+if [ "$product" = IslandMac ]; then
+  swift scripts/export-localizations.swift Sources/IslandMac/Resources/Localizable.xcstrings "$app/Contents/Resources"
+fi
+codesign --force --sign - --identifier "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Contents/Info.plist")" "$app"
 echo "$app"
