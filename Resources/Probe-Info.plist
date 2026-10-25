@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>dev.nativeisland.probe</string>
+<key>CFBundleName</key><string>IslandProbe</string>
+<key>CFBundleExecutable</key><string>IslandProbe</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>LSUIElement</key><true/>
+<key>NSAppleEventsUsageDescription</key><string>Inspect and route an explicitly selected agent session after the user grants Automation permission.</string>
+</dict></plist>
