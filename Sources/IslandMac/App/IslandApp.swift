@@ -79,6 +79,11 @@ import IslandCore
             alert.addButton(withTitle: "Quit and Close Terminals")
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
+            Task { @MainActor in
+                let stopped = await shell.terminals.closeAllAndWait()
+                sender.reply(toApplicationShouldTerminate: stopped)
+            }
+            return .terminateLater
         }
         for id in shell.terminals.sessionIDs { shell.terminals.close(id) }
         return .terminateNow

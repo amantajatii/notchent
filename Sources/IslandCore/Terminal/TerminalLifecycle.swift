@@ -2,6 +2,7 @@
 public struct TerminalLifecycle: Sendable {
     private var owned: Set<SessionID> = []
     private var running: Set<SessionID> = []
+    private var closing: Set<SessionID> = []
 
     public init() {}
     public var hasRunningOwnedSessions: Bool { !running.isEmpty }
@@ -16,8 +17,13 @@ public struct TerminalLifecycle: Sendable {
     public mutating func featureHidden() {}
     public mutating func featureSwitched() {}
     @discardableResult public mutating func close(_ id: SessionID) -> Bool {
-        running.remove(id)
-        return owned.remove(id) != nil
+        guard owned.contains(id), !closing.contains(id) else { return false }
+        if running.contains(id) { closing.insert(id) }
+        else { owned.remove(id) }
+        return true
     }
-    public mutating func processExited(_ id: SessionID) { running.remove(id) }
+    public mutating func processExited(_ id: SessionID) {
+        running.remove(id)
+        if closing.remove(id) != nil { owned.remove(id) }
+    }
 }

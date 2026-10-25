@@ -8,6 +8,7 @@ enum TerminalSessionError: Error {
     case invalidDirectory
     case unavailableShell
     case missingProcessIdentity
+    case missingPTYIdentity
 }
 
 /// Owns each PTY and terminal view independently of SwiftUI's presentation lifetime.
@@ -19,7 +20,19 @@ enum TerminalSessionError: Error {
 
     private let ownerInstanceID = UUID().uuidString
     private var views: [SessionID: LocalProcessTerminalView] = [:]
+    private var closingViews: [SessionID: LocalProcessTerminalView] = [:]
+    private var escalationTasks: [SessionID: Task<Void, Never>] = [:]
     private var directories: [SessionID: URL] = [:]
+    private var ptyIdentities: [SessionID: (device: dev_t, inode: ino_t, rawDevice: dev_t)] = [:]
+    /// Injectable for the PID-reuse regression; production reads kernel birth time.
+    var processBirthTime: (Int32) -> UInt64? = TerminalSessionStore.kernelBirthTime
+
+    nonisolated private static func kernelBirthTime(_ pid: Int32) -> UInt64? {
+        var info = proc_bsdinfo()
+        let size = MemoryLayout<proc_bsdinfo>.stride
+        guard pid > 0, proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(size)) == size else { return nil }
+        return info.pbi_start_tvsec * 1_000_000 + info.pbi_start_tvusec
+    }
 
     var hasRunningOwnedSessions: Bool { lifecycle.hasRunningOwnedSessions }
     func directory(for id: SessionID) -> URL? { directories[id] }
@@ -46,16 +59,20 @@ enum TerminalSessionError: Error {
         case .failure(let error): throw error
         }
         let pid = terminal.process.shellPid
-        var info = proc_bsdinfo()
-        let infoSize = MemoryLayout<proc_bsdinfo>.stride
-        guard pid > 0, proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(infoSize)) == infoSize else {
+        guard let birth = processBirthTime(pid) else {
             terminal.terminate()
             throw TerminalSessionError.missingProcessIdentity
         }
         let id = SessionID(ownerInstanceID: ownerInstanceID, pid: pid,
-                           processStartTime: info.pbi_start_tvsec * 1_000_000 + info.pbi_start_tvusec,
+                           processStartTime: birth,
                            terminalSessionKey: UUID().uuidString)
+        var ptyStat = stat()
+        guard terminal.process.childfd >= 0, fstat(terminal.process.childfd, &ptyStat) == 0 else {
+            terminal.terminate()
+            throw TerminalSessionError.missingPTYIdentity
+        }
         views[id] = terminal
+        ptyIdentities[id] = (ptyStat.st_dev, ptyStat.st_ino, ptyStat.st_rdev)
         directories[id] = resolved
         sessionIDs.append(id)
         selectedID = id
@@ -67,22 +84,80 @@ enum TerminalSessionError: Error {
 
     func close(_ id: SessionID) {
         guard let terminal = views.removeValue(forKey: id) else { return }
-        terminal.processDelegate = nil
+        let wasRunning = terminal.process.running
+        lifecycle.close(id)
+        if wasRunning { closingViews[id] = terminal }
         terminal.terminate()
         terminal.removeFromSuperview()
         directories.removeValue(forKey: id)
         sessionIDs.removeAll { $0 == id }
-        lifecycle.close(id)
         if selectedID == id { selectedID = sessionIDs.last }
+        if wasRunning {
+            escalationTasks[id] = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(600))
+                for _ in 0..<30 {
+                    guard !Task.isCancelled, let self, self.lifecycle.isRunning(id) else { return }
+                    self.escalateIfStillOwned(id)
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+            }
+        } else {
+            terminal.processDelegate = nil
+            ptyIdentities.removeValue(forKey: id)
+            lifecycle.processExited(id)
+        }
+    }
+
+    /// TIOCSIG sends SIGKILL through this owned PTY to its foreground process group.
+    /// Rechecking birth time rejects a reused shell PID; the PTY descriptor itself
+    /// bounds the signal target even if the shell exits between the check and ioctl.
+    func escalateIfStillOwned(_ id: SessionID) {
+        guard let terminal = closingViews[id], terminal.process.running,
+              terminal.process.shellPid == id.pid,
+              processBirthTime(id.pid) == id.processStartTime else { return }
+        let currentFD = terminal.process.childfd
+        guard currentFD >= 0, let identity = ptyIdentities[id] else { return }
+        // Hold a separate descriptor so SwiftTerm cannot close and recycle the
+        // integer between validation and TIOCSIG.
+        let fd = dup(currentFD)
+        guard fd >= 0 else { return }
+        defer { _ = Darwin.close(fd) }
+        var currentStat = stat()
+        guard fstat(fd, &currentStat) == 0,
+              currentStat.st_dev == identity.device, currentStat.st_ino == identity.inode,
+              currentStat.st_rdev == identity.rawDevice else { return }
+        if processBirthTime(id.pid) == id.processStartTime {
+            let foregroundGroup = tcgetpgrp(fd)
+            if foregroundGroup > 0, foregroundGroup != getpgrp(), getsid(foregroundGroup) == id.pid,
+               processBirthTime(id.pid) == id.processStartTime {
+                _ = Darwin.ioctl(fd, TIOCSIG, SIGKILL)
+            }
+        }
+    }
+
+    func closeAllAndWait() async -> Bool {
+        for id in sessionIDs { close(id) }
+        for _ in 0..<60 {
+            if !hasRunningOwnedSessions { return true }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return !hasRunningOwnedSessions
+    }
+
+    private func finish(_ id: SessionID) {
+        lifecycle.processExited(id)
+        escalationTasks.removeValue(forKey: id)?.cancel()
+        ptyIdentities.removeValue(forKey: id)
+        if let closed = closingViews.removeValue(forKey: id) { closed.processDelegate = nil }
     }
 
     func processTerminated(source: SwiftTerm.TerminalView, exitCode: Int32?) {
-        guard let id = views.first(where: { $0.value === source })?.key else { return }
-        lifecycle.processExited(id)
+        guard let id = views.first(where: { $0.value === source })?.key ?? closingViews.first(where: { $0.value === source })?.key else { return }
+        finish(id)
     }
     func processFailedToStart(source: SwiftTerm.TerminalView, error: LocalProcessError) {
-        guard let id = views.first(where: { $0.value === source })?.key else { return }
-        lifecycle.processExited(id)
+        guard let id = views.first(where: { $0.value === source })?.key ?? closingViews.first(where: { $0.value === source })?.key else { return }
+        finish(id)
     }
     func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
     func setTerminalTitle(source: LocalProcessTerminalView, title: String) {}

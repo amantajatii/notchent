@@ -22,10 +22,14 @@ struct TerminalLifecycleTests {
         lifecycle.open(first); lifecycle.open(second)
         let didClose = lifecycle.close(first)
         #expect(didClose)
-        #expect(!lifecycle.contains(first))
+        #expect(lifecycle.contains(first))
+        #expect(lifecycle.isRunning(first))
         #expect(lifecycle.contains(second))
         let closedAgain = lifecycle.close(first)
         #expect(!closedAgain)
+        lifecycle.processExited(first)
+        #expect(!lifecycle.contains(first))
+        #expect(lifecycle.contains(second))
     }
 
     @Test func quitRequiresConfirmationOnlyForRunningOwnedSessions() {
@@ -34,8 +38,10 @@ struct TerminalLifecycleTests {
         let session = id(100)
         lifecycle.open(session)
         #expect(lifecycle.shouldConfirmQuit)
+        lifecycle.close(session)
+        #expect(lifecycle.shouldConfirmQuit)
         lifecycle.processExited(session)
         #expect(!lifecycle.shouldConfirmQuit)
-        #expect(lifecycle.contains(session))
+        #expect(!lifecycle.contains(session))
     }
 }
