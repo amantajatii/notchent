@@ -26,6 +26,9 @@ struct MusicView: View {
                 } else if spotify.snapshot.availability == .requiresConsent {
                     Button(shell.text("spotifyConnect")) { Task { await spotify.connect() } }
                         .font(.caption.bold()).padding(.top, 4)
+                } else if spotify.snapshot.availability == .error {
+                    Button(shell.text("spotifyRetry")) { Task { await spotify.refresh() } }
+                        .font(.caption.bold()).padding(.top, 4)
                 }
                 if spotify.commandError != nil { Text(shell.text("spotifyCommandFailed")).font(.caption2).foregroundStyle(.orange) }
             }.frame(maxWidth: .infinity, alignment: .leading)
@@ -39,6 +42,7 @@ struct MusicView: View {
         case .requiresConsent: shell.text("spotifyNeedsConsent")
         case .denied: shell.text("spotifyDenied")
         case .available: shell.text("spotifyStopped")
+        case .error: shell.text("spotifyReadFailed")
         }
     }
     private func control(_ symbol: String, command: SpotifyCommand, label: String) -> some View {
@@ -71,17 +75,27 @@ struct SpotifyArtwork: View {
     }
 }
 
-/// Keeps at most eight small covers and four MiB of decoded source data.
+/// Keeps at most eight small covers and four MiB of downloaded source data.
 actor SpotifyArtworkCache {
     static let shared = SpotifyArtworkCache()
     private var entries: [(URL, Data)] = []
     private let maximumBytes = 4 * 1024 * 1024
+    private let maximumImageBytes = 512 * 1024
     func imageData(for url: URL) async -> Data? {
         guard url.scheme == "https" else { return nil }
         if let index = entries.firstIndex(where: { $0.0 == url }) { return entries[index].1 }
-        guard let (data, response) = try? await URLSession.shared.data(from: url),
-              let http = response as? HTTPURLResponse, http.statusCode == 200,
-              data.count <= 512 * 1024 else { return nil }
+        guard let (bytes, response) = try? await URLSession.shared.bytes(from: url) else { return nil }
+        defer { bytes.task.cancel() }
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              response.expectedContentLength < 0 || response.expectedContentLength <= maximumImageBytes else { return nil }
+        var data = Data()
+        data.reserveCapacity(min(max(0, Int(response.expectedContentLength)), maximumImageBytes))
+        do {
+            for try await byte in bytes {
+                guard !Task.isCancelled, data.count < maximumImageBytes else { return nil }
+                data.append(byte)
+            }
+        } catch { return nil }
         entries.append((url, data))
         while entries.count > 8 || entries.reduce(0, { $0 + $1.1.count }) > maximumBytes { entries.removeFirst() }
         return data

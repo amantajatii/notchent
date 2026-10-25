@@ -42,6 +42,7 @@ struct HomeView: View {
         case .requiresConsent: shell.text("spotifyNeedsConsent")
         case .denied: shell.text("spotifyDenied")
         case .available: shell.text("spotifyNoTrack")
+        case .error: shell.text("spotifyReadFailed")
         }
     }
 }

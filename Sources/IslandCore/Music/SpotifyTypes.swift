@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-public enum SpotifyAvailability: Sendable, Equatable { case unavailable, requiresConsent, denied, available }
+public enum SpotifyAvailability: Sendable, Equatable { case unavailable, requiresConsent, denied, available, error }
 public enum SpotifyPlayback: Sendable, Equatable { case unknown, stopped, paused, playing }
 public enum SpotifyCommand: Sendable, Equatable { case toggle, previous, next }
 public enum SpotifyFailure: Error, Sendable, Equatable { case unavailable, requiresConsent, denied, commandFailed(Int) }
@@ -41,14 +41,28 @@ public struct SpotifySnapshot: Sendable, Equatable {
     @Published public private(set) var commandError: SpotifyFailure?
     private let client: any SpotifyClient
     private var polling: Task<Void, Never>?
+    private var activationGeneration: UInt64 = 0
+    private var refreshRevision: UInt64 = 0
 
     public init(client: any SpotifyClient) { self.client = client }
 
-    public func refresh() async {
+    public func refresh() async { await refresh(expectedGeneration: nil) }
+
+    private func refresh(expectedGeneration: UInt64?) async {
+        refreshRevision &+= 1
+        let revision = refreshRevision
         do {
             let updated = try await client.snapshot()
+            guard mayPublish(revision: revision, generation: expectedGeneration) else { return }
             snapshot = updated.availability == .available ? updated : SpotifySnapshot(availability: updated.availability)
-        } catch { snapshot = SpotifySnapshot(availability: Self.availability(for: error)) }
+        } catch {
+            guard mayPublish(revision: revision, generation: expectedGeneration) else { return }
+            snapshot = SpotifySnapshot(availability: Self.availability(for: error))
+        }
+    }
+
+    private func mayPublish(revision: UInt64, generation: UInt64?) -> Bool {
+        !Task.isCancelled && revision == refreshRevision && (generation == nil || generation == activationGeneration)
     }
 
     public func perform(_ command: SpotifyCommand) async {
@@ -72,13 +86,22 @@ public struct SpotifySnapshot: Sendable, Equatable {
         catch { snapshot = SpotifySnapshot(availability: Self.availability(for: error)) }
     }
 
-    /// Poll only while Home or Music is visible. Hiding the panel cancels the next refresh.
+    /// Poll only while Home or Music is visible. Hiding invalidates in-flight observations.
     public func setActive(_ active: Bool) {
-        if !active { polling?.cancel(); polling = nil; return }
+        if !active {
+            guard polling != nil else { return }
+            activationGeneration &+= 1
+            refreshRevision &+= 1
+            polling?.cancel(); polling = nil
+            return
+        }
         guard polling == nil else { return }
+        activationGeneration &+= 1
+        let generation = activationGeneration
         polling = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.refresh()
+                await self?.refresh(expectedGeneration: generation)
+                if Task.isCancelled { return }
                 try? await Task.sleep(for: .seconds(5))
             }
         }
@@ -88,7 +111,8 @@ public struct SpotifySnapshot: Sendable, Equatable {
         switch error as? SpotifyFailure {
         case .denied: .denied
         case .requiresConsent: .requiresConsent
-        default: .unavailable
+        case .unavailable: .unavailable
+        default: .error
         }
     }
 }

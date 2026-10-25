@@ -6,7 +6,7 @@ import Testing
     var result = SpotifySnapshot(availability: .unavailable)
     var failure: SpotifyFailure?
     var commands: [SpotifyCommand] = []
-    func snapshot() async throws -> SpotifySnapshot { result }
+    func snapshot() async throws -> SpotifySnapshot { if let failure { throw failure }; return result }
     func perform(_ command: SpotifyCommand) async throws {
         commands.append(command)
         if let failure { throw failure }
@@ -66,5 +66,63 @@ import Testing
         #expect(store.snapshot.playback == .playing)
         #expect(store.snapshot.title == "Observed")
         #expect(store.commandError == .commandFailed(-1708))
+    }
+
+    @Test func transientReadFailureIsNotReportedAsSpotifyNotRunning() async {
+        let client = FakeSpotifyClient()
+        let store = SpotifyStore(client: client)
+        client.failure = .commandFailed(-1708)
+        await store.refresh()
+        #expect(store.snapshot.availability == .error)
+        client.failure = nil
+        client.result = SpotifySnapshot(availability: .available, playback: .playing, title: "Observed")
+        await store.refresh()
+        #expect(store.snapshot.title == "Observed")
+        client.failure = .commandFailed(-1708)
+        await store.refresh()
+        #expect(store.snapshot.availability == .error)
+        #expect(store.snapshot.title == nil)
+    }
+
+    @Test func canceledPollCannotPublishAfterDeactivation() async throws {
+        let client = DelayedSpotifyClient()
+        let store = SpotifyStore(client: client)
+        store.setActive(true)
+        try await client.waitForRequests(1)
+        store.setActive(false)
+        client.finish(0, with: SpotifySnapshot(availability: .available, playback: .playing, title: "Stale"))
+        try await Task.sleep(for: .milliseconds(10))
+        #expect(store.snapshot.availability == .unavailable)
+        #expect(store.snapshot.title == nil)
+    }
+
+    @Test func olderPollCannotOverwriteNewActivation() async throws {
+        let client = DelayedSpotifyClient()
+        let store = SpotifyStore(client: client)
+        store.setActive(true)
+        try await client.waitForRequests(1)
+        store.setActive(false)
+        store.setActive(true)
+        try await client.waitForRequests(2)
+        client.finish(1, with: SpotifySnapshot(availability: .available, playback: .paused, title: "New"))
+        try await Task.sleep(for: .milliseconds(10))
+        client.finish(0, with: SpotifySnapshot(availability: .available, playback: .playing, title: "Old"))
+        try await Task.sleep(for: .milliseconds(10))
+        #expect(store.snapshot.title == "New")
+        #expect(store.snapshot.playback == .paused)
+        store.setActive(false)
+    }
+}
+
+@MainActor private final class DelayedSpotifyClient: SpotifyClient {
+    private var pending: [CheckedContinuation<SpotifySnapshot, Error>] = []
+    func snapshot() async throws -> SpotifySnapshot {
+        try await withCheckedThrowingContinuation { pending.append($0) }
+    }
+    func perform(_ command: SpotifyCommand) async throws {}
+    func finish(_ index: Int, with result: SpotifySnapshot) { pending[index].resume(returning: result) }
+    func waitForRequests(_ count: Int) async throws {
+        for _ in 0..<100 where pending.count < count { try await Task.sleep(for: .milliseconds(1)) }
+        #expect(pending.count >= count)
     }
 }
