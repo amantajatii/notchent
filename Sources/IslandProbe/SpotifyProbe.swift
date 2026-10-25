@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import IslandCore
 
 struct SpotifyObservation: Codable {
     var applicationAvailability: String
@@ -18,43 +19,38 @@ final class SpotifyProbe: NSObject, NSApplicationDelegate {
     private static var running: NSRunningApplication? {
         NSRunningApplication.runningApplications(withBundleIdentifier: "com.spotify.client").first
     }
-    /// Preflight never asks macOS to display or approve an Automation prompt.
-    private static func permission() -> OSStatus? {
-        guard let app = running else { return nil }
-        let target = NSAppleEventDescriptor(processIdentifier: app.processIdentifier)
-        return AEDeterminePermissionToAutomateTarget(target.aeDesc, typeWildCard, typeWildCard, false)
+    private static func client() -> SpotifyEventClient? {
+        running.flatMap { SpotifyEventClient(application: $0) }
     }
-    private static func query(_ expression: String, command: Bool = false) -> (String?, Int?) {
-        guard running != nil else { return (nil, -600) }
-        // The running guard in both host and script avoids intentionally launching Spotify.
-        let source = """
-        if application id "com.spotify.client" is not running then return "not-running"
-        tell application id "com.spotify.client"
-            \(command ? expression : "return " + expression)
-        end tell
-        """
-        var error: NSDictionary?
-        let value = NSAppleScript(source: source)?.executeAndReturnError(&error)
-        return (value?.stringValue, (error?[NSAppleScript.errorNumber] as? NSNumber)?.intValue)
+    private static func read(_ client: SpotifyEventClient, property: UInt32, track: Bool = false, state: Bool = false) -> String {
+        do {
+            let value = try client.read(property, currentTrack: track)
+            if state {
+                switch value.enumCodeValue {
+                case 0x6B505350: return "playing"
+                case 0x6B505370: return "paused"
+                case 0x6B505353: return "stopped"
+                default: return "unavailable; unknown playback enum"
+                }
+            }
+            return value.stringValue?.isEmpty == false ? "available" : "unavailable"
+        } catch { return "unavailable (\((error as NSError).code))" }
     }
     static func observe() -> SpotifyObservation {
         let installed = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.spotify.client") != nil
         var observation = SpotifyObservation(applicationAvailability: installed ? "installed; not running" : "unavailable")
-        guard running != nil else { observation.playbackState = "not-running"; return observation }
+        guard let client = client() else { observation.playbackState = "not-running"; return observation }
         observation.applicationAvailability = "running"
-        let preflight = permission()
+        let preflight = client.permission()
         guard preflight == noErr else {
-            let code = preflight ?? -600
+            let code = preflight
             observation.automation = code == -1743 ? "denied (-1743)" : code == -1744 ? "requires-consent (-1744); no prompt requested" : "unavailable; preflight status \(code); no prompt requested"
             return observation
         }
         observation.automation = "authorized"
-        let state = query("player state as text")
-        observation.playbackState = state.1 == nil ? state.0 ?? "unavailable" : "unavailable (\(state.1!))"
-        let metadata = query("(name of current track is not \"\") as text")
-        observation.metadataAvailability = metadata.1 == nil ? metadata.0 ?? "unavailable" : "unavailable (\(metadata.1!))"
-        let artwork = query("(artwork url of current track is not \"\") as text")
-        observation.artworkAvailability = artwork.1 == nil ? "URL present: \(artwork.0 ?? "unknown"); bytes untested" : "unavailable (\(artwork.1!))"
+        observation.playbackState = read(client, property: 0x70506C53, state: true) // pPlS
+        observation.metadataAvailability = read(client, property: 0x706E616D, track: true) // pnam
+        observation.artworkAvailability = "URL: " + read(client, property: 0x6155726C, track: true) + "; bytes untested" // aUrl
         return observation
     }
     static func printObservation() {
@@ -93,12 +89,16 @@ final class SpotifyProbe: NSObject, NSApplicationDelegate {
         Self.printObservation()
     }
     @objc private func control(_ sender: NSButton) {
-        guard ["play", "pause", "next track", "previous track"].contains(sender.title), Self.permission() == noErr else {
+        guard ["play", "pause", "next track", "previous track"].contains(sender.title), let client = Self.client(), client.permission() == noErr else {
             status.stringValue = "Control not sent: Spotify unavailable or Automation not authorized."
             return
         }
-        let result = Self.query(sender.title + "\nreturn \"command completed\"", command: true)
-        status.stringValue = result.1 == nil ? "\(sender.title): command returned without error; verify actual playback manually." : "Control failed: \(result.1!)"
+        do {
+            _ = try client.control(sender.title)
+            status.stringValue = "\(sender.title): command returned without error; verify actual playback manually."
+        } catch {
+            status.stringValue = "Control unavailable/failed: \((error as NSError).code)"
+        }
         print(status.stringValue)
     }
 }
