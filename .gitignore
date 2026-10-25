@@ -1,0 +1,7 @@
+.build/
+.swiftpm/
+.superpowers/
+.DS_Store
+.env
+.env.*
+*.xcuserstate
