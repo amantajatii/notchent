@@ -35,12 +35,14 @@ import IslandCore
         }, onChange: { [weak self] in self?.send(.fullScreenChanged($0)) })
         pointer.start { [weak self] in self?.poll() }
     }
-    func stop() { fullScreen.stop(); pointer.stop(); transitionTask?.cancel(); transitionTask = nil; panel.orderOut(nil) }
+    func stop() { fullScreen.stop(); pointer.stop(); transitionTask?.cancel(); transitionTask = nil; shell.spotify.setActive(false); panel.orderOut(nil) }
     func send(_ event: IslandEvent) {
         // Refresh synchronously at request arrival instead of trusting a stale 500 ms sample.
         if case .pendingChanged = event { fullScreen.refresh() }
         if case .hide = event { inspectionPinned = false }
         let effects = IslandReducer.reduce(state: &shell.state, event: event)
+        let musicActive = shell.state.mode == .home || shell.state.mode == .feature(.home) || shell.state.mode == .feature(.music)
+        shell.spotify.setActive(musicActive)
         render()
         Task { @MainActor [weak self] in
             await Task.yield()
@@ -113,18 +115,9 @@ struct IslandRootView: View {
         if let native = shell.retainedNativeViews[feature] { RetainedNativeView(view: native) }
         else if let view = shell.featureViews[feature] { view }
         else if feature == .settings { SettingsView(shell: shell) }
-        else if feature == .home {
-            HStack(alignment: .center, spacing: 30) {
-                Label { VStack(alignment: .leading, spacing: 6) {
-                    Text("Spotify").font(.headline)
-                    Text(shell.text("musicUnavailable")).font(.caption).foregroundStyle(.secondary)
-                } } icon: { Image(systemName: "music.note").font(.largeTitle).frame(width: 56, height: 56).background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12)) }
-                VStack(alignment: .leading, spacing: 12) {
-                    Button(shell.text("agents")) { shell.dispatch?(.show(.agents)) }
-                    Button(shell.text("files")) { shell.dispatch?(.show(.files)) }
-                }.font(.caption)
-            }.frame(width: 520, alignment: .leading)
-        } else {
+        else if feature == .home { HomeView(shell: shell, spotify: shell.spotify) }
+        else if feature == .music { MusicView(shell: shell, spotify: shell.spotify) }
+        else {
             Text(shell.text(feature == .music ? "musicUnavailable" : feature == .agents ? "agentsUnavailable" : feature == .files ? "filesUnavailable" : "terminalUnavailable"))
                 .font(.callout).foregroundStyle(.secondary).padding(.vertical, 12).frame(width: 520)
         }

@@ -18,8 +18,10 @@ import IslandCore
     var dispatch: ((IslandEvent) -> Void)?
     /// Installed once by a feature owner; keep PTY/session services outside View lifecycle.
     @Published var featureViews: [IslandFeature: AnyView] = [:]
+    @Published var fileSummaryView: AnyView?
     /// Strong ownership of native terminal views survives switching routes and hiding the panel.
     @Published var retainedNativeViews: [IslandFeature: NSView] = [:]
+    let spotify = SpotifyStore(client: NativeSpotifyClient())
     init(store: SettingsStore = SettingsStore()) {
         self.store = store
         settings = (try? store.load()) ?? IslandSettings()

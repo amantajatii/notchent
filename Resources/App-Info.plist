@@ -11,4 +11,5 @@
 <key>LSUIElement</key><true/>
 <key>CFBundleDevelopmentRegion</key><string>en</string>
 <key>CFBundleLocalizations</key><array><string>en</string><string>id</string></array>
+<key>NSAppleEventsUsageDescription</key><string>IslandMac reads the current Spotify track and playback state and sends playback controls only when you use them.</string>
 </dict></plist>

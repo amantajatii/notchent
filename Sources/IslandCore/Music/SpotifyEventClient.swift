@@ -34,6 +34,12 @@ public final class SpotifyEventClient {
         return AEDeterminePermissionToAutomateTarget(Self.processTarget(pid: pid).aeDesc, typeWildCard, typeWildCard, false)
     }
 
+    /// Call only from the explicit Connect button. The preflight above never prompts.
+    public func requestPermission() -> OSStatus {
+        guard stillRunning else { return -600 }
+        return AEDeterminePermissionToAutomateTarget(Self.processTarget(pid: pid).aeDesc, typeWildCard, typeWildCard, true)
+    }
+
     public static func property(_ code: AEKeyword, container: NSAppleEventDescriptor = .null()) -> NSAppleEventDescriptor {
         let object = NSAppleEventDescriptor.record()
         object.setDescriptor(NSAppleEventDescriptor(typeCode: UInt32(typeProperty)), forKeyword: UInt32(keyAEDesiredClass))
