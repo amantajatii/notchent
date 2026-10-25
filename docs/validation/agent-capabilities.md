@@ -72,3 +72,9 @@ Runtime outcomes use observed / unsupported / unavailable / denied. Unexercised 
 ## Remaining controlled live checks
 
 Duplicate sessions, background tabs, resolved/expired prompts, permission revocation, and a response to an explicitly approved harmless prompt are all **untested**. No foreground success is claimed, so no background capability is inferred. A later controlled GUI run must verify owner and terminal session key, revalidate process birth time before action, and reject stale/expired prompt routes. Do not answer any live agent permission request automatically. No production integration recommendation can yet be made from this inventory.
+
+## Phase 1 aggregate gate — Task 3, 2026-10-25
+
+Receipt policy: 4/4 receipt tests pass (12/12 package tests); app rebuild passes. Native drag callback and promised-file destination writing scenes implemented. Finder copy/cancel/rejection and full-screen UI acceptance remain unverified. **No-go for automatic last-copy deletion or strict one-transfer promises** pending the product retention decision and live evidence. See `file-delivery.md`.
+
+Spotify 1.3.6.1921 is running; read-only no-prompt Automation preflight returns requires-consent (-1744), not denied. State/metadata/artwork and playback commands remain live untested. Conditional implementation go with permission states; no verified live integration claim. See `spotify.md`. Existing agent routing and panel gates above remain unchanged; passing unit tests do not clear their live gates.

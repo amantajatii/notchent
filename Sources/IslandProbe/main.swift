@@ -12,8 +12,10 @@ case "agent":
         observations = [CapabilityObservation(capability: "agent", outcome: .unavailable, evidence: "Select exactly one controlled session with agent --pid <positive PID>. No selection made.")]
     }
 case "panel": PanelProbe.run()
-case "drag", "spotify":
-    observations = [CapabilityObservation(capability: scenario, outcome: .unsupported, evidence: "Scenario not implemented in Task 1.")]
+case "drag": DragProbe.run()
+case "spotify":
+    if args.dropFirst().contains("--observe") { SpotifyProbe.printObservation(); exit(0) }
+    SpotifyProbe.run()
 default:
     observations = [CapabilityObservation(capability: "scenario", outcome: .unsupported, evidence: "Unknown scenario. Available names: inventory, agent, panel, drag, spotify.")]
 }
