@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import IslandCore
 
 struct IslandReducerTests {
@@ -48,5 +49,55 @@ struct IslandReducerTests {
         var normal = IslandState()
         _ = IslandReducer.reduce(state: &normal, event: .pendingChanged(1))
         #expect(normal.mode == .prompt)
+    }
+}
+
+struct IslandShellRegressionTests {
+    @Test func unrelatedUpdatesPreserveOpenDeadline() {
+        var s = IslandState()
+        let effects = IslandReducer.reduce(state: &s, event: .pointerEntered)
+        let token = s.generation
+        #expect(IslandReducer.reduce(state: &s, event: .pendingChanged(0)).isEmpty)
+        #expect(IslandReducer.reduce(state: &s, event: .fullScreenChanged(true)).isEmpty)
+        #expect(s.generation == token)
+        #expect(effects == [.schedule(.open, token: token, milliseconds: 450)])
+        _ = IslandReducer.reduce(state: &s, event: .timer(.open, token: token))
+        #expect(s.mode == .home)
+    }
+    @Test func unrelatedUpdatesPreserveCloseDeadline() {
+        var s = IslandState(); s.pointerInside = true
+        _ = IslandReducer.reduce(state: &s, event: .show(.home))
+        _ = IslandReducer.reduce(state: &s, event: .pointerExited)
+        let token = s.generation
+        #expect(IslandReducer.reduce(state: &s, event: .pendingChanged(0)).isEmpty)
+        #expect(IslandReducer.reduce(state: &s, event: .fullScreenChanged(true)).isEmpty)
+        #expect(s.generation == token)
+        _ = IslandReducer.reduce(state: &s, event: .timer(.close, token: token))
+        #expect(s.mode == .hidden)
+    }
+    @Test func menuRoutesOutsideScheduleDismissal() {
+        for feature in [IslandFeature.home, .settings] {
+            var s = IslandState()
+            let effects = IslandReducer.reduce(state: &s, event: .show(feature))
+            #expect(effects == [.schedule(.close, token: s.generation, milliseconds: 1000)])
+            _ = IslandReducer.reduce(state: &s, event: .timer(.close, token: s.generation))
+            #expect(s.mode == .hidden)
+        }
+    }
+    @Test func fullScreenPendingRemainsReachableOnHome() {
+        var s = IslandState(); s.pointerInside = true
+        _ = IslandReducer.reduce(state: &s, event: .show(.home))
+        _ = IslandReducer.reduce(state: &s, event: .fullScreenChanged(true))
+        _ = IslandReducer.reduce(state: &s, event: .pendingChanged(2))
+        #expect(s.mode == .home)
+        #expect(s.showsPendingAffordance)
+        _ = IslandReducer.reduce(state: &s, event: .openPrompt)
+        #expect(s.mode == .prompt)
+    }
+    @Test func unknownFullScreenObservationIsConservative() {
+        #expect(FullScreenAssessment.isFullScreen(windowBounds: nil, screen: CGRect(x: 0, y: 0, width: 1440, height: 900)))
+        #expect(FullScreenAssessment.isFullScreen(windowBounds: [], screen: CGRect(x: 0, y: 0, width: 1440, height: 900)))
+        #expect(FullScreenAssessment.isFullScreen(windowBounds: [CGRect(x: 0, y: 0, width: 1440, height: 900)], screen: CGRect(x: 0, y: 0, width: 1440, height: 900)))
+        #expect(!FullScreenAssessment.isFullScreen(windowBounds: [CGRect(x: 120, y: 100, width: 700, height: 500)], screen: CGRect(x: 0, y: 0, width: 1440, height: 900)))
     }
 }

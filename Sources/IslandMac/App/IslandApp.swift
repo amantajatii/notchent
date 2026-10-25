@@ -48,7 +48,10 @@ import IslandCore
         shell.settingsDidChange = { [weak self] in self?.rebuildMenu() }
         rebuildMenu()
         controller.start()
-        if CommandLine.arguments.contains("--show") { controller.send(.show(.home)) }
+        if CommandLine.arguments.contains("--show") {
+            controller.inspectionPinned = true
+            controller.send(.show(.home))
+        }
     }
     private func rebuildMenu() {
         let menu = NSMenu()

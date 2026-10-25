@@ -12,7 +12,9 @@ import IslandCore
     let shell: IslandShell
     private let panel = IslandPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
     private let pointer = PointerMonitor()
-    private var tasks: [Task<Void, Never>] = []
+    private let fullScreen = FullScreenMonitor()
+    private var transitionTask: Task<Void, Never>?
+    var inspectionPinned = false
     private var inside = false
     private var host: NSHostingView<IslandRootView>!
     private var screen: NSScreen? { NSScreen.screens.first { $0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] .map { CGDisplayIsBuiltin(($0 as! NSNumber).uint32Value) != 0 } ?? false } ?? NSScreen.main }
@@ -26,21 +28,35 @@ import IslandCore
         panel.contentView = host
         shell.dispatch = { [weak self] in self?.send($0) }
     }
-    func start() { pointer.start { [weak self] in self?.poll() } }
-    func stop() { pointer.stop(); tasks.forEach { $0.cancel() }; tasks.removeAll(); panel.orderOut(nil) }
+    func start() {
+        fullScreen.start(screenBounds: { [weak self] in
+            guard let number = self?.screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { return nil }
+            return CGDisplayBounds(number.uint32Value)
+        }, onChange: { [weak self] in self?.send(.fullScreenChanged($0)) })
+        pointer.start { [weak self] in self?.poll() }
+    }
+    func stop() { fullScreen.stop(); pointer.stop(); transitionTask?.cancel(); transitionTask = nil; panel.orderOut(nil) }
     func send(_ event: IslandEvent) {
-        tasks.forEach { $0.cancel() }; tasks.removeAll()
+        // Refresh synchronously at request arrival instead of trusting a stale 500 ms sample.
+        if case .pendingChanged = event { fullScreen.refresh() }
+        if case .hide = event { inspectionPinned = false }
         let effects = IslandReducer.reduce(state: &shell.state, event: event)
         render()
         Task { @MainActor [weak self] in
             await Task.yield()
             self?.render()
         }
-        for case let .schedule(kind, token, milliseconds) in effects {
-            tasks.append(Task { [weak self] in
-                do { try await Task.sleep(for: .milliseconds(milliseconds)) } catch { return }
-                self?.send(.timer(kind, token: token))
-            })
+        for effect in effects {
+            transitionTask?.cancel()
+            transitionTask = nil
+            if case let .schedule(kind, token, milliseconds) = effect {
+                transitionTask = Task { [weak self] in
+                    do { try await Task.sleep(for: .milliseconds(milliseconds)) } catch { return }
+                    guard let self else { return }
+                    if self.inspectionPinned && kind == .close { return }
+                    self.send(.timer(kind, token: token))
+                }
+            }
         }
     }
     private func poll() {
@@ -65,8 +81,14 @@ struct IslandRootView: View {
     @ObservedObject var shell: IslandShell
     var body: some View {
         VStack(spacing: 12) {
+            if shell.state.showsPendingAffordance {
+                Button { shell.dispatch?(.openPrompt) } label: {
+                    Label("\(shell.text("pending")): \(shell.state.pendingCount)", systemImage: "bubble.left.fill")
+                        .font(.caption.bold()).padding(8)
+                }
+            }
             if shell.state.mode == .hidden {
-                Button { shell.dispatch?(.openPrompt) } label: { Text("\(shell.state.pendingCount)").font(.caption.bold()).padding(8) }
+                EmptyView()
             } else if shell.state.mode == .drop {
                 Label(shell.text("drop"), systemImage: "tray.and.arrow.down").padding(28)
             } else if shell.state.mode == .prompt {
@@ -77,9 +99,6 @@ struct IslandRootView: View {
                         Button(shell.text(feature.rawValue)) { shell.dispatch?(.show(feature)) }
                     }
                 }.font(.caption).foregroundStyle(.secondary)
-                if shell.state.inputActive && shell.state.pendingCount > 0 {
-                    Button(shell.text("pending")) { shell.dispatch?(.openPrompt) }
-                }
                 content
             }
         }
