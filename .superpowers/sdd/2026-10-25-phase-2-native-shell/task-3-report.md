@@ -32,3 +32,20 @@ Status: DONE_WITH_CONCERNS (native Finder acceptance and restart are pending).
 ## Self-review
 
 Checked that unknown receipts retain the copy; only a verified promised destination triggers removal. The drag trigger compares pasteboard change count with idle to avoid showing Drop on an ordinary click after an old file drag. No original path is deleted, no whole-file byte load or unbounded directory traversal was introduced. The report does not claim the pending native checks.
+
+## Round 1 review fixes (after `ae30e37`)
+
+- Replaced the immediate post-write `.confirmed` call with a per-attempt `DeliveryGate`. Confirmation now requires both a successful independent destination byte comparison and a final native `.copy` drag operation. Cancellation and failed writes are terminal, including when a promise callback finishes later. The provider carries its attempt identity so delayed callbacks cannot act on a newer drag. Copy/compare now runs off the MainActor; the native completion callback receives cancellation if a drag was canceled during a pending write.
+- Validated owned deletion paths before changing the manifest. The sole accepted form is `Files/<item UUID>` under the shelf root; symlinked root, Files directory, or target are rejected. The same validation runs before import copying, so a symlinked Files directory cannot redirect a new copy outside the shelf. `completeDelivery(.confirmed)` uses the same guarded removal.
+- Registered each copy target for rollback before invoking FileManager copy. A partial copy that throws is now removed, and the manifest/in-memory items remain unchanged.
+- Replaced the old unrelated `.tmp` test with an injected failed manifest replacement that leaves the previous on-disk manifest and actor state intact. Added an injected partial-copy failure and forged traversal/symlink deletion tests.
+- `NSDraggingDestination.performDragOperation` must return synchronously; the shelf import remains asynchronous. Its `true` value means the native destination accepted file URLs, not that persistence succeeded. Failure is now shown in both Files and Home summary. No Finder delivery result is claimed.
+
+### Round 1 TDD and verification
+
+- RED: `scripts/test.sh --filter 'FileShelfTests|DeliveryReceiptTests'` exited 1 before the fix with missing `DeliveryGate`, missing `FileShelfOperations`, and unsupported injected initializer. This represented the missing ordering and failure-injection behavior.
+- GREEN: same focused command exited 0 with 17 tests in 2 suites passed. New cases cover write-before-cancel, cancel-before-write, accepted-before-write, write-before-accepted, failed write, failed partial copy, failed manifest replacement and actor rollback, forged traversal path, and symlinked Files directory.
+- Final `scripts/test.sh` exited 0: 45 tests in 10 suites passed; the opt-in Spotify live test remains skipped. `scripts/build-app.sh` exited 0, signed bundle generated. `git diff --check` clean. Existing SwiftPM native-build-system deprecation warning remains.
+- Did not relaunch the app or repeat live UI/Finder checks during this review fix. The previously launched normal-mode process may still run the prior bundle until root restarts it. Mac restart remains pending at a user-chosen time.
+
+Self-review: the confirmed transition is issued once per attempt, only after both signals; a canceled attempt stays retained even when its write task returns. Unsafe decoded paths throw before manifest mutation. The injected failure tests exercise actual copy/write interruption points rather than unrelated sidecar files. Native Finder callback ordering and destination behavior remain unverified live.

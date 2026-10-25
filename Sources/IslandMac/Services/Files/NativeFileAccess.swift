@@ -50,6 +50,12 @@ import IslandCore
     /// and independently compared its bytes with the retained source. No source is removed here.
     func writePromise(for id: UUID, to destination: URL) async throws {
         guard let source = await sourceURL(for: id) else { throw CocoaError(.fileReadNoSuchFile) }
+        try await Task.detached(priority: .userInitiated) {
+            try Self.copyAndVerify(source: source, destination: destination)
+        }.value
+    }
+
+    private nonisolated static func copyAndVerify(source: URL, destination: URL) throws {
         let access = source.startAccessingSecurityScopedResource()
         defer { if access { source.stopAccessingSecurityScopedResource() } }
         try FileManager.default.copyItem(at: source, to: destination)

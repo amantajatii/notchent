@@ -47,6 +47,9 @@ struct FileShelfSummary: View {
             Label(shell.text("files"), systemImage: "square.stack")
             Text("\(access.items.count) \(shell.text("shelfItems"))")
                 .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            if let error = access.error {
+                Text(error).font(.caption2).foregroundStyle(.red).lineLimit(2).help(error)
+            }
         }
     }
 }

@@ -52,11 +52,72 @@ struct FileShelfTests {
     @Test func interruptedWriteKeepsPreviousManifest() async throws {
         let (root, source) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let location = root.appendingPathComponent("Shelf")
-        let shelf = try FileShelf(root: location)
-        let item = try await shelf.importFiles([source], mode: .copy).first!
-        try Data("interrupted".utf8).write(to: location.appendingPathComponent("manifest.json.tmp"))
+        let original = try FileShelf(root: location)
+        let item = try await original.importFiles([source], mode: .copy).first!
+        let failing = try FileShelf(root: location, operations: FileShelfOperations(
+            copy: { try FileManager.default.copyItem(at: $0, to: $1) },
+            writeManifest: { _, destination in
+                try Data("partial".utf8).write(to: destination.deletingLastPathComponent().appendingPathComponent("interrupted.tmp"))
+                throw CocoaError(.fileWriteUnknown)
+            }
+        ))
+        await #expect(throws: Error.self) { try await failing.importFiles([source], mode: .copy) }
+        #expect(await failing.items().map(\.id) == [item.id])
         let reopened = try FileShelf(root: location)
         #expect(await reopened.items().map(\.id) == [item.id])
+    }
+
+    @Test func failedPartialCopyLeavesNoOwnedOrphan() async throws {
+        let (root, source) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let location = root.appendingPathComponent("Shelf")
+        let shelf = try FileShelf(root: location, operations: FileShelfOperations(
+            copy: { _, destination in
+                try Data("partial".utf8).write(to: destination)
+                throw CocoaError(.fileWriteUnknown)
+            },
+            writeManifest: { try $0.write(to: $1, options: .atomic) }
+        ))
+        await #expect(throws: Error.self) { try await shelf.importFiles([source], mode: .copy) }
+        #expect(await shelf.items().isEmpty)
+        let files = location.appendingPathComponent("Files")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: files.path).isEmpty)
+    }
+
+    @Test func forgedOwnedPathCannotDeleteOutsideShelf() async throws {
+        let (root, source) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let location = root.appendingPathComponent("Shelf")
+        try FileManager.default.createDirectory(at: location, withIntermediateDirectories: true)
+        let id = UUID()
+        let forged = ShelfItem(id: id, displayName: "source.txt", storageMode: .copy,
+                               ownedRelativePath: "../source.txt", bookmark: nil, isAvailable: true)
+        try JSONEncoder().encode([forged]).write(to: location.appendingPathComponent("manifest.json"))
+        let shelf = try FileShelf(root: location)
+        await #expect(throws: Error.self) { try await shelf.remove(id) }
+        await #expect(throws: Error.self) { try await shelf.completeDelivery(id, receipt: .confirmed) }
+        #expect(FileManager.default.fileExists(atPath: source.path))
+        #expect(await shelf.items().count == 1)
+        let reopened = try FileShelf(root: location)
+        #expect(await reopened.items().count == 1)
+    }
+
+    @Test func symlinkedFilesDirectoryCannotEscapeShelf() async throws {
+        let (root, source) = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let location = root.appendingPathComponent("Shelf")
+        let outside = root.appendingPathComponent("Outside")
+        try FileManager.default.createDirectory(at: location, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        let id = UUID()
+        let victim = outside.appendingPathComponent(id.uuidString)
+        try Data("untouched".utf8).write(to: victim)
+        try FileManager.default.createSymbolicLink(at: location.appendingPathComponent("Files"), withDestinationURL: outside)
+        let forged = ShelfItem(id: id, displayName: "victim", storageMode: .copy,
+                               ownedRelativePath: "Files/\(id.uuidString)", bookmark: nil, isAvailable: true)
+        try JSONEncoder().encode([forged]).write(to: location.appendingPathComponent("manifest.json"))
+        let shelf = try FileShelf(root: location)
+        await #expect(throws: Error.self) { try await shelf.remove(id) }
+        await #expect(throws: Error.self) { try await shelf.importFiles([source], mode: .copy) }
+        #expect(try Data(contentsOf: victim) == Data("untouched".utf8))
+        #expect(await shelf.items().count == 1)
     }
 
     @Test func unconfirmedDeliveryRetainsOwnedCopy() async throws {
