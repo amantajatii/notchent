@@ -1,6 +1,6 @@
 # Agent capability probe — 2026-10-25
 
-Task 1 establishes a safe inventory and identity foundation. **No agent/host combination is verified for prompt extraction or response routing.** The no-CLI-setup feasibility gate remains open. No hooks, plugins, global installations, credentials, environment, private session databases, or raw transcripts were accessed.
+**Phase status: foundation ready; live integration gate pending.** Task 1 foundation acceptance does not complete the controlled live feasibility checks. **No agent/host combination is verified for prompt extraction or response routing.** The no-CLI-setup feasibility gate remains open. No hooks, plugins, global installations, credentials, environment, private session databases, or raw transcripts were accessed.
 
 ## Reproduce
 
@@ -11,7 +11,11 @@ Task 1 establishes a safe inventory and identity foundation. **No agent/host com
 - `IslandProbe agent --pid <positive PID>` inspects only one explicitly selected controlled process's birth time. It does not infer an owner/pane or accept arbitrary response text.
 - `panel`, `drag`, and `spotify` dispatch to explicit unsupported observations.
 
-Swift 6.4 CLT uses swiftbuild by default, which failed to find XCTest. XCTest was also absent in native mode. Bundled Swift Testing works with native mode, `--disable-xctest`, and explicit developer framework search/rpath flags; `scripts/test.sh` applies these locally using `xcode-select -p`. No toolchain changes. Native engine emits its documented deprecation warning. Minimum macOS 14 matches the plan and bundled Testing.
+Swift 6.4 CLT uses swiftbuild by default, which failed to find XCTest. XCTest was also absent in native mode. Bundled Swift Testing works with native mode, `--disable-xctest`, and explicit developer framework search/rpath flags; `scripts/test.sh` applies these locally using `xcode-select -p`. No toolchain changes. Native engine emits this exact diagnostic:
+
+> warning: '--build-system native' has been deprecated and will be removed in a future release; please report an issue at https://github.com/swiftlang/swift-package-manager/issues if you are unable to adopt the default build system.
+
+Migration follow-up: reproduce CLT framework discovery with the default swiftbuild engine and report the failure upstream; migrate both scripts to the default engine once it resolves bundled Swift Testing and links the probe successfully. Keep the warning visible until then. Minimum macOS 14 matches the plan and bundled Testing.
 
 ## Observed inventory
 
@@ -19,8 +23,8 @@ Swift 6.4 CLT uses swiftbuild by default, which failed to find XCTest. XCTest wa
 | --- | --- | --- |
 | Codex CLI | 0.164.0 | `codex --version`; installed executable only |
 | Claude Code | 2.1.258 | `claude --version`; installed executable only |
-| Antigravity CLI | unavailable on current PATH | `command -v antigravity`; app installation is not CLI proof |
-| Oh My Pi | unavailable on current PATH | `command -v pi`; alternate names/locations unverified |
+| Antigravity CLI (`agy`) | 1.4.7 | `~/.local/bin/agy --version`, exit 0; executable contains Antigravity-branded metadata |
+| Oh My Pi / `omp` alias | 18.12.6 | `/opt/homebrew/bin/omp --version` → `omp/18.12.6`, exit 0; Homebrew symlink and formula identify `omp.sh` coding agent |
 | VS Code | 1.143.1 | `/Applications/Visual Studio Code.app` Info.plist |
 | Orca | 1.4.238 | `/Applications/Orca.app` Info.plist; bundle ID `com.stablyai.orca` |
 | Terminal | 2.15 | `/System/Applications/Utilities/Terminal.app` Info.plist |
@@ -30,9 +34,11 @@ The executable inventory observed `AXIsProcessTrusted() == true` for this execut
 
 Selected controlled shell metadata probe observed a process birth time through `proc_pidinfo`; no agent session selected. Session IDs combine owner instance, PID, microsecond process birth time, and terminal pane/session key. Unknown owner or missing key resolves to nil. Caller-supplied identity components are not discovery evidence or permission to send; this probe offers no send operation.
 
+Alternate executable verification used subprocess argument arrays with a 10-second timeout for `--version` and `--help`. `agy --help` identifies agent CLI session options; embedded executable metadata includes Antigravity-branded assets. `/opt/homebrew/bin/omp` resolves to `../Cellar/omp/18.12.6/bin/omp`; its Homebrew formula states “Coding agent with the IDE wired in” and homepage `https://omp.sh`, whose [official site](https://omp.sh/) currently brands the product as `omp`. The requested Oh My Pi alias is recorded with that current executable identity, without treating it as an exercised integration. No session was launched by these version/help checks.
+
 ## Capability matrix
 
-D = session discovery, R = prompt extraction, S = response routing, O = open origin. `untested` is evidence status, not a successful boolean. Installed host/version applies to each row. Missing CLI means unavailable under the PATH check only.
+D = session discovery, R = prompt extraction, S = response routing, O = open origin. `untested` is evidence status, not a successful boolean. Installed host/version applies to each row. The requested alternate CLI names `agy` and `omp` were inspected directly; absence of `antigravity` or `pi` on PATH is not evidence of missing installations. These checks establish executable inventory only.
 
 | Agent (exact CLI version) | Host (exact version) | D | R | S | O | Tested scope |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -44,14 +50,14 @@ D = session discovery, R = prompt extraction, S = response routing, O = open ori
 | Claude Code 2.1.258 | Orca 1.4.238 | untested | untested | untested | untested | inventory only |
 | Claude Code 2.1.258 | Terminal 2.15 | untested | untested | untested | untested | inventory only |
 | Claude Code 2.1.258 | iTerm2 3.7.3 | untested | untested | untested | untested | inventory only |
-| Antigravity CLI unavailable | VS Code 1.143.1 | unavailable | untested | untested | untested | PATH only |
-| Antigravity CLI unavailable | Orca 1.4.238 | unavailable | untested | untested | untested | PATH only |
-| Antigravity CLI unavailable | Terminal 2.15 | unavailable | untested | untested | untested | PATH only |
-| Antigravity CLI unavailable | iTerm2 3.7.3 | unavailable | untested | untested | untested | PATH only |
-| Oh My Pi unavailable | VS Code 1.143.1 | unavailable | untested | untested | untested | PATH only |
-| Oh My Pi unavailable | Orca 1.4.238 | unavailable | untested | untested | untested | PATH only |
-| Oh My Pi unavailable | Terminal 2.15 | unavailable | untested | untested | untested | PATH only |
-| Oh My Pi unavailable | iTerm2 3.7.3 | unavailable | untested | untested | untested | PATH only |
+| Antigravity (`agy`) 1.4.7 | VS Code 1.143.1 | untested | untested | untested | untested | executable inventory only |
+| Antigravity (`agy`) 1.4.7 | Orca 1.4.238 | untested | untested | untested | untested | executable inventory only |
+| Antigravity (`agy`) 1.4.7 | Terminal 2.15 | untested | untested | untested | untested | executable inventory only |
+| Antigravity (`agy`) 1.4.7 | iTerm2 3.7.3 | untested | untested | untested | untested | executable inventory only |
+| Oh My Pi / `omp` 18.12.6 | VS Code 1.143.1 | untested | untested | untested | untested | executable inventory only |
+| Oh My Pi / `omp` 18.12.6 | Orca 1.4.238 | untested | untested | untested | untested | executable inventory only |
+| Oh My Pi / `omp` 18.12.6 | Terminal 2.15 | untested | untested | untested | untested | executable inventory only |
+| Oh My Pi / `omp` 18.12.6 | iTerm2 3.7.3 | untested | untested | untested | untested | executable inventory only |
 
 Runtime outcomes use observed / unsupported / unavailable / denied. Unexercised checks use unavailable with explicit unverified evidence when emitted; unsupported means this probe lacks the adapter, not that the host can never support it. `AgentCapabilities` flags default false and must not be interpreted as test outcomes; observations carry evidence.
 
