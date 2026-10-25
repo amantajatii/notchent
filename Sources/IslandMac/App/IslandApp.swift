@@ -22,6 +22,7 @@ import IslandCore
     /// Strong ownership of native terminal views survives switching routes and hiding the panel.
     @Published var retainedNativeViews: [IslandFeature: NSView] = [:]
     let spotify = SpotifyStore(client: NativeSpotifyClient())
+    let files = NativeFileAccess()
     init(store: SettingsStore = SettingsStore()) {
         self.store = store
         settings = (try? store.load()) ?? IslandSettings()
@@ -45,6 +46,8 @@ import IslandCore
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         controller = IslandPanelController(shell: shell)
+        shell.featureViews[.files] = AnyView(FileShelfView(shell: shell, access: shell.files))
+        shell.fileSummaryView = AnyView(FileShelfSummary(shell: shell, access: shell.files))
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "capsule.fill", accessibilityDescription: "IslandMac")
         shell.settingsDidChange = { [weak self] in self?.rebuildMenu() }

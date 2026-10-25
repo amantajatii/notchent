@@ -16,7 +16,9 @@ import IslandCore
     private var transitionTask: Task<Void, Never>?
     var inspectionPinned = false
     private var inside = false
-    private var host: NSHostingView<IslandRootView>!
+    private var dragHot = false
+    private var idleDragChangeCount: Int?
+    private var host: FileDropHostingView!
     private var screen: NSScreen? { NSScreen.screens.first { $0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] .map { CGDisplayIsBuiltin(($0 as! NSNumber).uint32Value) != 0 } ?? false } ?? NSScreen.main }
     init(shell: IslandShell) {
         self.shell = shell
@@ -24,7 +26,13 @@ import IslandCore
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false; panel.isReleasedWhenClosed = false
         panel.backgroundColor = .clear; panel.isOpaque = false; panel.hasShadow = false
-        host = NSHostingView(rootView: IslandRootView(shell: shell))
+        host = FileDropHostingView(rootView: IslandRootView(shell: shell))
+        host.onDragActive = { [weak self] active in self?.setDragHot(active) }
+        host.onDropFiles = { [weak self] urls in
+            guard let self else { return }
+            shell.files.importURLs(urls, mode: shell.settings.fileStorage)
+            self.setDragHot(false)
+        }
         panel.contentView = host
         shell.dispatch = { [weak self] in self?.send($0) }
     }
@@ -37,6 +45,8 @@ import IslandCore
     }
     func stop() { fullScreen.stop(); pointer.stop(); transitionTask?.cancel(); transitionTask = nil; shell.spotify.setActive(false); panel.orderOut(nil) }
     func send(_ event: IslandEvent) {
+        if case .show(.files) = event { shell.files.refresh() }
+        if case .show(.home) = event { shell.files.refresh() }
         // Refresh synchronously at request arrival instead of trusting a stale 500 ms sample.
         if case .pendingChanged = event { fullScreen.refresh() }
         if case .hide = event { inspectionPinned = false }
@@ -65,8 +75,19 @@ import IslandCore
         guard let screen else { return }
         let point = NSEvent.mouseLocation
         let trigger = PanelGeometry.triggerRect(screen: screen.frame, menuBarHeight: max(24, screen.safeAreaInsets.top, NSStatusBar.system.thickness))
+        let mouseDown = NSEvent.pressedMouseButtons & 1 != 0
+        let dragBoard = NSPasteboard(name: .drag)
+        if !mouseDown { idleDragChangeCount = dragBoard.changeCount }
+        let hasFileURLs = dragBoard.types?.contains(.fileURL) == true && dragBoard.changeCount != idleDragChangeCount
+        let hoveringDropArea = trigger.contains(point) || (panel.isVisible && panel.frame.contains(point))
+        setDragHot(mouseDown && hasFileURLs && hoveringDropArea)
         let next = trigger.contains(point) || (panel.isVisible && panel.frame.contains(point))
         if next != inside { inside = next; send(next ? .pointerEntered : .pointerExited) }
+    }
+    private func setDragHot(_ active: Bool) {
+        guard dragHot != active else { return }
+        dragHot = active
+        send(.dragChanged(active))
     }
     private func render() {
         let visible = shell.state.mode != .hidden || shell.state.pendingCount > 0
@@ -92,7 +113,7 @@ struct IslandRootView: View {
             if shell.state.mode == .hidden {
                 EmptyView()
             } else if shell.state.mode == .drop {
-                Label(shell.text("drop"), systemImage: "tray.and.arrow.down").padding(28)
+                DropZoneView(shell: shell)
             } else if shell.state.mode == .prompt {
                 Text(shell.text("promptUnavailable")).padding(24)
             } else {
