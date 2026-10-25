@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import IslandCore
+import SwiftTerm
 
 @MainActor private final class IslandPanel: NSPanel {
     var inputEnabled = false
@@ -73,6 +74,8 @@ import IslandCore
     }
     private func poll() {
         guard let screen else { return }
+        let focusedTerminal = shell.state.mode == .feature(.terminal) && panel.isKeyWindow && panel.firstResponder is LocalProcessTerminalView
+        if focusedTerminal != shell.state.inputActive { send(.inputChanged(focusedTerminal)) }
         let point = NSEvent.mouseLocation
         let trigger = PanelGeometry.triggerRect(screen: screen.frame, menuBarHeight: max(24, screen.safeAreaInsets.top, NSStatusBar.system.thickness))
         let mouseDown = NSEvent.pressedMouseButtons & 1 != 0
@@ -92,7 +95,7 @@ import IslandCore
     private func render() {
         let visible = shell.state.mode != .hidden || shell.state.pendingCount > 0
         guard visible, let screen else { panel.orderOut(nil); return }
-        panel.inputEnabled = shell.state.inputActive || shell.state.mode == .feature(.settings)
+        panel.inputEnabled = shell.state.inputActive || shell.state.mode == .feature(.terminal) || shell.state.mode == .feature(.settings)
         host.layoutSubtreeIfNeeded()
         let size = host.fittingSize
         panel.setFrame(PanelGeometry.panelRect(screen: screen.frame, size: size), display: true)

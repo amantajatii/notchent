@@ -23,6 +23,7 @@ import IslandCore
     @Published var retainedNativeViews: [IslandFeature: NSView] = [:]
     let spotify = SpotifyStore(client: NativeSpotifyClient())
     let files = NativeFileAccess()
+    let terminals = TerminalSessionStore()
     init(store: SettingsStore = SettingsStore()) {
         self.store = store
         settings = (try? store.load()) ?? IslandSettings()
@@ -47,6 +48,7 @@ import IslandCore
         NSApp.setActivationPolicy(.accessory)
         controller = IslandPanelController(shell: shell)
         shell.featureViews[.files] = AnyView(FileShelfView(shell: shell, access: shell.files))
+        shell.featureViews[.terminal] = AnyView(TerminalFeatureView(store: shell.terminals, shell: shell))
         shell.fileSummaryView = AnyView(FileShelfSummary(shell: shell, access: shell.files))
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "capsule.fill", accessibilityDescription: "IslandMac")
@@ -69,5 +71,17 @@ import IslandCore
     @objc private func open() { controller.send(.show(.home)) }
     @objc private func settings() { controller.send(.show(.settings)) }
     @objc private func quit() { NSApp.terminate(nil) }
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if shell.terminals.hasRunningOwnedSessions {
+            let alert = NSAlert()
+            alert.messageText = "Quit IslandMac?"
+            alert.informativeText = "Running terminals created in IslandMac will be closed."
+            alert.addButton(withTitle: "Quit and Close Terminals")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
+        }
+        for id in shell.terminals.sessionIDs { shell.terminals.close(id) }
+        return .terminateNow
+    }
     func applicationWillTerminate(_ notification: Notification) { controller.stop() }
 }
