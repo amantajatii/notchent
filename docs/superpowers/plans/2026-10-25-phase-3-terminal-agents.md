@@ -64,3 +64,11 @@
 - [ ] Test Quit with owned sessions and confirm external sessions remain untouched. Report the controlled Mac-restart shelf test as pending until the user chooses to perform it.
 - [ ] Write launch/use/permissions instructions and the actual support matrix. Explicitly identify gaps; incomplete external-agent or file-delivery requirements prevent claiming the full MVP is complete.
 - [ ] Commit only implementation/docs from this task. Deliver the local app path and verification summary; do not upload, push, notarize, or publish.
+
+### Task 4: Codex shared-daemon adapter gate
+
+Installed Codex exposes a public proxy to its standard shared app-server, and the matching protocol supports a possible second-client subscription. This is source/schema feasibility only; the control socket was absent during inspection. Do not enable prompt actions from this evidence alone.
+
+- [ ] With a user-owned harmless test thread and standard CLI launch, verify metadata discovery and additive resume without changing CLI configuration, hooks, or startup method.
+- [ ] Verify pending approval and user-input replay, exact typed response, original CLI usability, resolution notifications, competing response, disconnect/reconnect, thread unload race, and daemon restart. Never answer a live request without the user's explicit choice or expose native user-verification requests.
+- [ ] Keep Codex adapter unavailable until these checks pass; update capability and acceptance evidence by exact tested request type and version.

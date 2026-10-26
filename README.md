@@ -34,7 +34,7 @@ Terminal: pilih folder untuk membuat sesi shell. **Hide** menyembunyikan panel d
 
 | CLI | Nama executable yang dicari | Discovery | Baca pertanyaan / kirim jawaban |
 | --- | --- | --- | --- |
-| Codex CLI | `codex` | Metadata kandidat | Belum diimplementasikan |
+| Codex CLI | `codex` | Metadata kandidat | Belum diimplementasikan; jalur app-server publik terkonfirmasi, runtime menunggu sesi uji terkendali |
 | Claude Code | `claude` | Metadata kandidat | Belum diimplementasikan |
 | Antigravity CLI | `agy` | Metadata kandidat | Belum diimplementasikan |
 | Oh My Pi | `omp` | Metadata kandidat | Belum diimplementasikan |

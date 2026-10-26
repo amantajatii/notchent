@@ -63,6 +63,14 @@ Runtime outcomes use observed / unsupported / unavailable / denied. Unexercised 
 
 ## Public surface research
 
+### Codex shared app-server follow-up — 2026-10-26
+
+The installed Codex 0.164.0 exposes `codex app-server proxy`, a public stdio proxy to its already-running shared app-server. The matching installed schemas contain loaded-thread listing, running-thread resume, typed approval/user-input requests, and resolved notifications. Matching upstream release source supports additive subscribers and replay of ordinary pending requests. This establishes a plausible integration route, not an active capability.
+
+At inspection, `codex app-server daemon version` failed because `~/.codex/app-server-control/app-server-control.sock` did not exist. No Codex CLI session was running for a controlled test. No CLI or daemon was started, no thread metadata/transcript was read, and no live request was attached or answered. Consequently the shipped adapter remains unavailable and Codex prompt display/response are **not implemented**. Do not infer working UI integration from protocol schemas or upstream source.
+
+Before enabling an adapter, validate with a user-owned harmless test thread: metadata-only discovery, additive subscribe while the original CLI remains usable, pending request replay, answer from each client, first-response-wins/dismissal, disconnect/reconnect, thread unload race, and daemon restart. Only ordinary approval and user-input request types with exact UI representations may be actionable; never expose native user-verification requests or apply broader session/policy approvals implicitly. Resume changes daemon client attribution and can affect thread lifecycle/idle eviction; implementation must document and bound that subscription.
+
 - [VS Code API](https://code.visualstudio.com/api/references/vscode-api) exposes terminal objects and sendText inside extensions. This is not evidence of an external native macOS interface; installing an extension would violate this phase's setup constraint.
 - [VS Code shell integration](https://code.visualstudio.com/docs/terminal/shell-integration) documents shell state integration; no installation/configuration was performed.
 - [iTerm2 session API](https://iterm2.com/python-api/session.html) documents session IDs and session operations. API enablement, identity mapping, and authorization were not exercised.
