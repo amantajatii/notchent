@@ -673,6 +673,294 @@
           }
         }
       }
+    },
+    "agentMetadataNotice": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discovery uses process metadata. Prompt reading and replies are not implemented; live verification is pending."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deteksi memakai metadata proses. Pembacaan permintaan dan jawaban belum diimplementasikan; verifikasi langsung masih tertunda."
+          }
+        }
+      }
+    },
+    "noDetectedAgents": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No agent sessions mapped to an owned terminal or target host/TTY. Script wrappers may be unavailable."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada sesi agent terpetakan ke terminal internal atau aplikasi asal/TTY target. Wrapper skrip mungkin tidak tersedia."
+          }
+        }
+      }
+    },
+    "projectUnknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project unknown"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project tidak diketahui"
+          }
+        }
+      }
+    },
+    "hostUnknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Host identity unavailable"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identitas aplikasi asal tidak tersedia"
+          }
+        }
+      }
+    },
+    "agentStatusUnknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detected · activity unknown"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terdeteksi · aktivitas tidak diketahui"
+          }
+        }
+      }
+    },
+    "ownedMetadata": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mapped to an owned terminal by process ancestry and birth time."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terpetakan ke terminal internal melalui proses induk dan waktu mulai."
+          }
+        }
+      }
+    },
+    "externalPaneUnknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "External host and TTY detected; stable pane identity unverified. Origin control unavailable."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aplikasi asal dan TTY terdeteksi; identitas pane belum terverifikasi. Kontrol asal tidak tersedia."
+          }
+        }
+      }
+    },
+    "agentReadSendUnavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read/send not implemented: no verified CLI prompt or delivery mechanism. Permissions alone do not enable replies."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baca/kirim belum diimplementasikan: mekanisme permintaan atau pengiriman CLI belum terverifikasi. Izin saja tidak mengaktifkan jawaban."
+          }
+        }
+      }
+    },
+    "openTerminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open terminal"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buka terminal"
+          }
+        }
+      }
+    },
+    "reply": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reply"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jawaban"
+          }
+        }
+      }
+    },
+    "send": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kirim"
+          }
+        }
+      }
+    },
+    "back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kembali"
+          }
+        }
+      }
+    },
+    "openPrompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open pending request"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buka permintaan tertunda"
+          }
+        }
+      }
+    },
+    "responseUnavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Response unavailable or delivery uncertain. Check the original session; no automatic retry."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jawaban tidak tersedia atau pengiriman belum pasti. Periksa sesi asal; tidak ada pengiriman ulang otomatis."
+          }
+        }
+      }
+    },
+    "unmappedAgents": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Executable candidates without a proven target host/TTY; no session cards"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kandidat executable tanpa aplikasi asal/TTY terbukti; tidak menjadi card sesi"
+          }
+        }
+      }
+    },
+    "deliveryUnknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delivery unknown. Check the original session. This response will not be retried."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengiriman belum pasti. Periksa sesi asal. Jawaban ini tidak akan dikirim ulang."
+          }
+        }
+      }
+    },
+    "deliverySent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent; confirmation pending. Check the original session before continuing."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terkirim; menunggu konfirmasi. Periksa sesi asal sebelum melanjutkan."
+          }
+        }
+      }
+    },
+    "deliveryRejected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Response rejected. Check the original session."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jawaban ditolak. Periksa sesi asal."
+          }
+        }
+      }
     }
   }
 }

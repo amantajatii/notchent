@@ -6,9 +6,11 @@ public enum IslandTimer: Equatable, Sendable { case open, close }
 public enum IslandEffect: Equatable, Sendable { case schedule(IslandTimer, token: UInt64, milliseconds: Int), cancelTimer }
 public enum IslandEvent: Sendable {
     case pointerEntered, pointerExited, timer(IslandTimer, token: UInt64), show(IslandFeature), hide
-    case inputChanged(Bool), dragChanged(Bool), pendingChanged(Int), fullScreenChanged(Bool), openPrompt
+    case inputChanged(Bool), dragChanged(Bool), pendingChanged(Int), fullScreenChanged(Bool), openPrompt, closePrompt
 }
 public struct IslandState: Equatable, Sendable {
+    public var showsPromptBanner: Bool { pendingCount > 0 && mode == .feature(.terminal) && !fullScreen }
+    public var promptReturnMode: IslandMode?
     public var showsPendingAffordance: Bool { pendingCount > 0 }
     public var mode: IslandMode = .hidden
     public var pendingCount = 0
@@ -51,6 +53,7 @@ public enum IslandReducer {
             s.pointerInside = false
             return closeIfOutside(&s)
         case let .show(feature):
+            s.promptReturnMode = nil
             s.mode = feature == .home ? .home : .feature(feature)
             return closeIfOutside(&s)
         case .hide:
@@ -64,15 +67,19 @@ public enum IslandReducer {
         case let .pendingChanged(count):
             let previous = s.pendingCount
             s.pendingCount = max(0, count)
-            if count > previous && !s.inputActive && !s.dragActive && (!s.fullScreen || s.settings.fullScreenPrompts == .automatic) {
+            if count > previous && s.mode != .feature(.terminal) && !s.inputActive && !s.dragActive && (!s.fullScreen || s.settings.fullScreenPrompts == .automatic) {
                 s.mode = .prompt
                 return closeIfOutside(&s)
             }
-            if count == 0 && s.mode == .prompt { s.mode = .hidden; return cancel(&s) }
+            if count == 0 && s.mode == .prompt { s.mode = s.promptReturnMode ?? .hidden; s.promptReturnMode = nil; return cancel(&s) }
             // Count-only updates must not alter an existing hover deadline.
         case let .fullScreenChanged(active): s.fullScreen = active
+        case .closePrompt:
+            guard s.mode == .prompt else { return [] }
+            s.mode = s.promptReturnMode ?? .hidden; s.promptReturnMode = nil
+            return closeIfOutside(&s)
         case .openPrompt:
-            if s.pendingCount > 0 && !s.dragActive { s.mode = .prompt; return closeIfOutside(&s) }
+            if s.pendingCount > 0 && !s.dragActive { if s.mode != .prompt { s.promptReturnMode = s.mode }; s.mode = .prompt; return closeIfOutside(&s) }
         }
         return []
     }

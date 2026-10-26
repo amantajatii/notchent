@@ -51,6 +51,7 @@ import SwiftTerm
         // Refresh synchronously at request arrival instead of trusting a stale 500 ms sample.
         if case .pendingChanged = event { fullScreen.refresh() }
         if case .hide = event { inspectionPinned = false }
+        let previousMode = shell.state.mode
         let effects = IslandReducer.reduce(state: &shell.state, event: event)
         let musicActive = shell.state.mode == .home || shell.state.mode == .feature(.home) || shell.state.mode == .feature(.music)
         shell.spotify.setActive(musicActive)
@@ -58,6 +59,11 @@ import SwiftTerm
         Task { @MainActor [weak self] in
             await Task.yield()
             self?.render()
+            if previousMode == .prompt, let self, self.shell.state.mode == .feature(.terminal),
+               let id = self.shell.terminals.selectedID {
+                self.panel.makeKey()
+                self.panel.makeFirstResponder(self.shell.terminals.view(for: id))
+            }
         }
         for effect in effects {
             transitionTask?.cancel()
@@ -74,7 +80,7 @@ import SwiftTerm
     }
     private func poll() {
         guard let screen else { return }
-        let focusedTerminal = shell.state.mode == .feature(.terminal) && panel.isKeyWindow && panel.firstResponder is LocalProcessTerminalView
+        let focusedTerminal = panel.isKeyWindow && ((shell.state.mode == .feature(.terminal) && panel.firstResponder is LocalProcessTerminalView) || (shell.state.mode == .prompt && panel.firstResponder is NSTextView))
         if focusedTerminal != shell.state.inputActive { send(.inputChanged(focusedTerminal)) }
         let point = NSEvent.mouseLocation
         let trigger = PanelGeometry.triggerRect(screen: screen.frame, menuBarHeight: max(24, screen.safeAreaInsets.top, NSStatusBar.system.thickness))
@@ -95,7 +101,7 @@ import SwiftTerm
     private func render() {
         let visible = shell.state.mode != .hidden || shell.state.pendingCount > 0
         guard visible, let screen else { panel.orderOut(nil); return }
-        panel.inputEnabled = shell.state.inputActive || shell.state.mode == .feature(.terminal) || shell.state.mode == .feature(.settings)
+        panel.inputEnabled = shell.state.mode == .prompt || shell.state.inputActive || shell.state.mode == .feature(.terminal) || shell.state.mode == .feature(.settings)
         host.layoutSubtreeIfNeeded()
         let size = host.fittingSize
         panel.setFrame(PanelGeometry.panelRect(screen: screen.frame, size: size), display: true)
@@ -108,17 +114,14 @@ struct IslandRootView: View {
     var body: some View {
         VStack(spacing: 12) {
             if shell.state.showsPendingAffordance {
-                Button { shell.dispatch?(.openPrompt) } label: {
-                    Label("\(shell.text("pending")): \(shell.state.pendingCount)", systemImage: "bubble.left.fill")
-                        .font(.caption.bold()).padding(8)
-                }
+                PromptBannerView(shell: shell)
             }
             if shell.state.mode == .hidden {
                 EmptyView()
             } else if shell.state.mode == .drop {
                 DropZoneView(shell: shell)
             } else if shell.state.mode == .prompt {
-                Text(shell.text("promptUnavailable")).padding(24)
+                PromptView(registry: shell.agents, shell: shell)
             } else {
                 HStack(spacing: 18) {
                     ForEach(IslandFeature.allCases, id: \.self) { feature in

@@ -24,6 +24,7 @@ import IslandCore
     let spotify = SpotifyStore(client: NativeSpotifyClient())
     let files = NativeFileAccess()
     let terminals = TerminalSessionStore()
+    let agents = AgentRegistry()
     init(store: SettingsStore = SettingsStore()) {
         self.store = store
         settings = (try? store.load()) ?? IslandSettings()
@@ -49,6 +50,8 @@ import IslandCore
         controller = IslandPanelController(shell: shell)
         shell.featureViews[.files] = AnyView(FileShelfView(shell: shell, access: shell.files))
         shell.featureViews[.terminal] = AnyView(TerminalFeatureView(store: shell.terminals, shell: shell))
+        shell.featureViews[.agents] = AnyView(AgentListView(registry: shell.agents, shell: shell))
+        shell.agents.start(terminals: shell.terminals) { [weak shell] count in shell?.dispatch?(.pendingChanged(count)) }
         shell.fileSummaryView = AnyView(FileShelfSummary(shell: shell, access: shell.files))
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "capsule.fill", accessibilityDescription: "IslandMac")
@@ -88,5 +91,5 @@ import IslandCore
         for id in shell.terminals.sessionIDs { shell.terminals.close(id) }
         return .terminateNow
     }
-    func applicationWillTerminate(_ notification: Notification) { controller.stop() }
+    func applicationWillTerminate(_ notification: Notification) { shell.agents.stop(); controller.stop() }
 }
