@@ -17,10 +17,15 @@ struct NativeAgentAdapter: AgentAdapter {
     @Published private(set) var prompt: AgentPrompt?
     @Published private(set) var pendingCount = 0
     @Published var responseError: String?
-    let coordinator = AgentCoordinator()
+    let coordinator: AgentCoordinator
+    private var pendingDidChange: ((Int) -> Void)?
+    init(coordinator: AgentCoordinator = AgentCoordinator(), pendingChanged: ((Int) -> Void)? = nil) {
+        self.coordinator = coordinator; self.pendingDidChange = pendingChanged
+    }
     private var task: Task<Void, Never>?
     func start(terminals: TerminalSessionStore, changed: @escaping (Int) -> Void) {
         guard task == nil else { return }
+        pendingDidChange = changed
         task = Task { [weak self, weak terminals] in
             guard let self else { return }
             for kind in AgentKind.allCases { await coordinator.register(NativeAgentAdapter(kind: kind), for: kind) }
@@ -32,12 +37,12 @@ struct NativeAgentAdapter: AgentAdapter {
                 unmappedCount = found.count - agents.count
                 let queue = await coordinator.queue
                 if prompt?.id != queue.head?.id { responseError = nil }
-                prompt = queue.head; pendingCount = queue.count; changed(queue.count)
+                publish(queue)
                 try? await Task.sleep(for: .seconds(3))
             }
         }
     }
-    func respond(_ response: AgentResponse, to prompt: AgentPrompt) {
+    func respond(_ response: AgentResponse, to prompt: AgentPrompt) -> Task<Void, Never> {
         Task {
             do {
                 try await coordinator.respond(id: prompt.id, revision: prompt.revision, response: response)
@@ -50,8 +55,12 @@ struct NativeAgentAdapter: AgentAdapter {
             }
             catch { responseError = "responseUnavailable" }
             let queue = await coordinator.queue
-            self.prompt = queue.head; pendingCount = queue.count
+            publish(queue)
         }
+    }
+    private func publish(_ queue: PromptQueue) {
+        prompt = queue.head; pendingCount = queue.count
+        pendingDidChange?(queue.count)
     }
     func stop() { task?.cancel(); task = nil; Task { await coordinator.stop() } }
 }

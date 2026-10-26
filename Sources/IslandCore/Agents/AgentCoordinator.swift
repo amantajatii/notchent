@@ -13,16 +13,34 @@ public actor AgentCoordinator {
         streams[kind] = Task { [weak self] in
             for await event in adapter.events() {
                 guard !Task.isCancelled else { return }
-                await self?.ingest(event)
+                await self?.ingest(event, from: kind)
             }
         }
     }
     public func stop() { for task in streams.values { task.cancel() }; streams.removeAll() }
+    private func ingest(_ event: AgentEvent, from adapterKind: AgentKind) {
+        switch event {
+        case .route(let route): guard route.kind == adapterKind else { return }
+        case .prompt(_, let kind), .resolved(_, let kind): guard kind == adapterKind else { return }
+        case .exited(let session):
+            guard routes[session]?.kind == adapterKind || kinds.contains(where: { $0.key.sessionID == session && $0.value == adapterKind }) else { return }
+        }
+        ingest(event)
+    }
     public func ingest(_ event: AgentEvent) {
         switch event {
-        case .route(let route): routes[route.sessionID] = route
-        case let .prompt(prompt, kind): queue.receive(prompt); kinds[prompt.id] = kind
-        case .resolved(let id): queue.resolve(id)
+        case .route(let route):
+            guard routes[route.sessionID].map({ $0.kind == route.kind }) ?? true,
+                  !kinds.contains(where: { $0.key.sessionID == route.sessionID && $0.value != route.kind }) else { return }
+            routes[route.sessionID] = route
+        case let .prompt(prompt, kind):
+            guard kinds[prompt.id].map({ $0 == kind }) ?? true,
+                  !kinds.contains(where: { $0.key.sessionID == prompt.sessionID && $0.value != kind }),
+                  routes[prompt.sessionID].map({ $0.kind == kind }) ?? true else { return }
+            if queue.receive(prompt) { kinds[prompt.id] = kind }
+        case let .resolved(id, kind):
+            guard kinds[id] == kind else { return }
+            queue.resolve(id)
         case .exited(let id): routes.removeValue(forKey: id); queue.sessionExited(id)
         }
     }

@@ -39,7 +39,7 @@ struct AgentDiscoveryTests {
     }
     @Test func allNativeAdaptersFailClosed() async {
         let id = SessionID(ownerInstanceID: "test", pid: 1, processStartTime: 1, terminalSessionKey: "pane")
-        let prompt = AgentPrompt(id: PromptID("p"), sessionID: id, revision: 1, text: "?", choices: [], acceptsText: true)
+        let prompt = AgentPrompt(id: PromptID(sessionID: id, localRequestID: "p"), revision: 1, text: "?", choices: [], acceptsText: true)
         for kind in AgentKind.allCases {
             let adapter = NativeAgentAdapter(kind: kind)
             await #expect(throws: AgentRoutingError.unavailable) { try await adapter.validate(sessionID: id) }

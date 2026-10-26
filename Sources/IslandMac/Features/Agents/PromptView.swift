@@ -13,11 +13,11 @@ struct PromptView: View {
                 Text("PID \(prompt.sessionID.pid)").font(.caption).foregroundStyle(.secondary)
                 Text(prompt.text).textSelection(.enabled)
                 ForEach(prompt.choices, id: \.id) { choice in
-                    Button(choice.text) { registry.respond(.choice(choice.id), to: prompt) }
+                    Button(choice.text) { _ = registry.respond(.choice(choice.id), to: prompt) }
                 }
                 if prompt.acceptsText {
                     TextField(shell.text("reply"), text: $reply.text)
-                    Button(shell.text("send")) { registry.respond(.text(reply.text), to: prompt) }
+                    Button(shell.text("send")) { _ = registry.respond(.text(reply.text), to: prompt) }
                 }
                 if let error = registry.responseError { Text(shell.text(error)).font(.caption) }
             } else { Text(shell.text("promptUnavailable")) }

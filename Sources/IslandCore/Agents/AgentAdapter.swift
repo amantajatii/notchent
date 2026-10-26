@@ -1,6 +1,13 @@
 import Foundation
 
-public struct PromptID: Hashable, Sendable { public let rawValue: String; public init(_ value: String) { rawValue = value } }
+/// A CLI-local request ID is meaningful only within its exact process/owner/pane identity.
+public struct PromptID: Hashable, Sendable {
+    public let sessionID: SessionID
+    public let localRequestID: String
+    public init(sessionID: SessionID, localRequestID: String) {
+        self.sessionID = sessionID; self.localRequestID = localRequestID
+    }
+}
 public struct PromptChoice: Equatable, Sendable {
     public let id: String
     public let text: String
@@ -8,13 +15,13 @@ public struct PromptChoice: Equatable, Sendable {
 }
 public struct AgentPrompt: Equatable, Sendable {
     public let id: PromptID
-    public let sessionID: SessionID
+    public var sessionID: SessionID { id.sessionID }
     public let revision: UInt64
     public let text: String
     public let choices: [PromptChoice]
     public let acceptsText: Bool
-    public init(id: PromptID, sessionID: SessionID, revision: UInt64, text: String, choices: [PromptChoice], acceptsText: Bool) {
-        self.id = id; self.sessionID = sessionID; self.revision = revision; self.text = text; self.choices = choices; self.acceptsText = acceptsText
+    public init(id: PromptID, revision: UInt64, text: String, choices: [PromptChoice], acceptsText: Bool) {
+        self.id = id; self.revision = revision; self.text = text; self.choices = choices; self.acceptsText = acceptsText
     }
 }
 public enum AgentResponse: Equatable, Sendable { case choice(String), text(String) }
@@ -29,7 +36,7 @@ public struct AgentRoute: Sendable {
     }
 }
 public enum AgentEvent: Sendable {
-    case route(AgentRoute), prompt(AgentPrompt, kind: AgentKind), resolved(PromptID), exited(SessionID)
+    case route(AgentRoute), prompt(AgentPrompt, kind: AgentKind), resolved(PromptID, kind: AgentKind), exited(SessionID)
 }
 public enum AgentRoutingError: Error, Equatable { case missingPrompt, notFIFOHead, staleRevision, invalidResponse, unavailable, identityChanged, permissionRevoked, deliveryAlreadyAttempted }
 public protocol AgentAdapter: Sendable {
