@@ -40,3 +40,9 @@ No full-screen acceptance promise is made before these live checks. Other-app fu
 ### Launch diagnostics
 
 Own-process verification confirmed PID 29467 `isFinishedLaunching=true`, accessory activation policy. CoreGraphics own-window metadata reported a 640×332 titled host and 680×180 panel at layer 25. Sampling showed the normal AppKit run loop and pointer timer (not a blocked inventory call). A diagnostic duplicate direct launch was terminated; original probe left running for root checks. Root CUA resolves by bundle ID `dev.nativeisland.probe`; lookup by full bundle path timed out. Root reports actual AX/screenshot of visible hover-mode panel and controls; interaction/full-screen results pending separately.
+
+## Phase 3 final evidence reconciliation — 2026-10-26
+
+The dimensions and controls above describe the Phase 1 probe, not a verified rendering of the current app. Root observed early native Home and Settings and an English → Indonesian → English switch. The rendered navigation appeared as a row, rather than the intended footer placement; this minor appearance discrepancy remains deferred. Compact layout, scaling, Reduce Motion, keyboard focus indicators, hidden menu-bar click access, current-build hover and full-screen interaction remain unverified. No visual PASS is inferred from geometry or reducer tests.
+
+Task 3 CUA inventory responded but did not list IslandMac; no app launch/restart or `--show` instance was used to force visibility. An older process may still exist outside that inventory and may still run the earlier binary. The pre-existing SwiftPM native-engine deprecation warning remains visible; the current CLT test workaround is documented in README. See mvp-acceptance.md for all 15 criteria and explicit implementation gaps.

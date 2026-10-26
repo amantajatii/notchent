@@ -14,6 +14,9 @@ cp "$bin_dir/$product" "$app/Contents/MacOS/$product"
 cp "$plist" "$app/Contents/Info.plist"
 if [ "$product" = IslandMac ]; then
   swift scripts/export-localizations.swift Sources/IslandMac/Resources/Localizable.xcstrings "$app/Contents/Resources"
+  # SwiftTerm is statically linked; its MIT notice must accompany the app.
+  mkdir -p "$app/Contents/Resources/ThirdPartyNotices"
+  cp .build/checkouts/SwiftTerm/LICENSE "$app/Contents/Resources/ThirdPartyNotices/SwiftTerm-LICENSE.txt"
 fi
 codesign --force --sign - --identifier "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Contents/Info.plist")" "$app"
 echo "$app"
