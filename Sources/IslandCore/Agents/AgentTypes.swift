@@ -24,7 +24,7 @@ public struct SessionID: Hashable, Codable, Sendable {
 }
 
 public enum AgentKind: String, Codable, CaseIterable, Sendable { case codex, antigravity, claudeCode, ohMyPi }
-public enum HostKind: String, Codable, CaseIterable, Sendable { case vscode, orca, terminal, iterm2 }
+public enum HostKind: String, Codable, CaseIterable, Sendable { case vscode, orca, terminal, iterm2, codexDesktop }
 public enum ProbeOutcome: String, Codable, Sendable { case observed, unsupported, unavailable, denied }
 public struct AgentCapabilities: Codable, Sendable {
     public let discovery: Bool

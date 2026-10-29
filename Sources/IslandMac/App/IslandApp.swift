@@ -4,6 +4,9 @@ import IslandCore
 
 @MainActor final class IslandShell: ObservableObject {
     @Published var state = IslandState()
+    @Published var presentedMode: IslandMode = .hidden
+    let surface = IslandSurfaceState()
+    var contentSizeDidChange: ((IslandMode, CGSize) -> Void)?
     @Published var persistenceError: String?
     @Published var settings: IslandSettings {
         didSet {
@@ -14,6 +17,7 @@ import IslandCore
         }
     }
     let store: SettingsStore
+    private let localizations: Bundle
     var settingsDidChange: (() -> Void)?
     var dispatch: ((IslandEvent) -> Void)?
     /// Installed once by a feature owner; keep PTY/session services outside View lifecycle.
@@ -25,13 +29,14 @@ import IslandCore
     let files = NativeFileAccess()
     let terminals = TerminalSessionStore()
     let agents = AgentRegistry()
-    init(store: SettingsStore = SettingsStore()) {
+    init(store: SettingsStore = SettingsStore(), localizations: Bundle = .main) {
         self.store = store
+        self.localizations = localizations
         settings = (try? store.load()) ?? IslandSettings()
         state.settings = settings
     }
     func text(_ key: String) -> String {
-        guard let path = Bundle.main.path(forResource: settings.language.rawValue, ofType: "lproj"), let bundle = Bundle(path: path) else { return key }
+        guard let path = localizations.path(forResource: settings.language.rawValue, ofType: "lproj"), let bundle = Bundle(path: path) else { return key }
         return bundle.localizedString(forKey: key, value: key, table: nil)
     }
 }
@@ -51,17 +56,24 @@ import IslandCore
         shell.featureViews[.files] = AnyView(FileShelfView(shell: shell, access: shell.files))
         shell.featureViews[.terminal] = AnyView(TerminalFeatureView(store: shell.terminals, shell: shell))
         shell.featureViews[.agents] = AnyView(AgentListView(registry: shell.agents, shell: shell))
+        shell.agents.completionChanged = { [weak shell] in shell?.dispatch?(.agentCompleted) }
         shell.agents.start(terminals: shell.terminals) { [weak shell] count in shell?.dispatch?(.pendingChanged(count)) }
         shell.fileSummaryView = AnyView(FileShelfSummary(shell: shell, access: shell.files))
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "capsule.fill", accessibilityDescription: "IslandMac")
+        statusItem.button?.image = NSImage(systemSymbolName: "capsule.fill", accessibilityDescription: "Notchent")
         shell.settingsDidChange = { [weak self] in self?.rebuildMenu() }
         rebuildMenu()
         controller.start()
         if CommandLine.arguments.contains("--show") {
             controller.inspectionPinned = true
             controller.send(.show(.home))
+        } else {
+            controller.send(.reveal(.home))
         }
+    }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        controller?.send(.reveal(.home))
+        return false
     }
     private func rebuildMenu() {
         let menu = NSMenu()
@@ -71,14 +83,14 @@ import IslandCore
         }
         statusItem.menu = menu
     }
-    @objc private func open() { controller.send(.show(.home)) }
-    @objc private func settings() { controller.send(.show(.settings)) }
+    @objc private func open() { controller.send(.reveal(.home)) }
+    @objc private func settings() { controller.send(.reveal(.settings)) }
     @objc private func quit() { NSApp.terminate(nil) }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if shell.terminals.hasRunningOwnedSessions {
             let alert = NSAlert()
-            alert.messageText = "Quit IslandMac?"
-            alert.informativeText = "Running terminals created in IslandMac will be closed."
+            alert.messageText = "Quit Notchent?"
+            alert.informativeText = "Running terminals created in Notchent will be closed."
             alert.addButton(withTitle: "Quit and Close Terminals")
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }

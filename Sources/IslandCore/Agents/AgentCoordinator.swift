@@ -1,4 +1,6 @@
 public actor AgentCoordinator {
+    public nonisolated let updates: AsyncStream<PromptQueue>
+    private let updateContinuation: AsyncStream<PromptQueue>.Continuation
     public private(set) var queue = PromptQueue()
     public private(set) var receipts: [PromptID: ResponseReceipt] = [:]
     private var routes: [SessionID: AgentRoute] = [:]
@@ -6,7 +8,10 @@ public actor AgentCoordinator {
     private var adapters: [AgentKind: any AgentAdapter] = [:]
     private var attempted: Set<PromptID> = []
     private var streams: [AgentKind: Task<Void, Never>] = [:]
-    public init() {}
+    public init() {
+        let (updates, continuation) = AsyncStream<PromptQueue>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        self.updates = updates; self.updateContinuation = continuation
+    }
     public func register(_ adapter: any AgentAdapter, for kind: AgentKind) {
         streams[kind]?.cancel()
         adapters[kind] = adapter
@@ -43,6 +48,7 @@ public actor AgentCoordinator {
             queue.resolve(id)
         case .exited(let id): routes.removeValue(forKey: id); queue.sessionExited(id)
         }
+        updateContinuation.yield(queue)
     }
     public func respond(id: PromptID, revision: UInt64, response: AgentResponse) async throws {
         guard let prompt = queue.prompt(id) else { throw AgentRoutingError.missingPrompt }
@@ -51,6 +57,7 @@ public actor AgentCoordinator {
         switch response {
         case .choice(let choice): guard prompt.choices.contains(where: { $0.id == choice }) else { throw AgentRoutingError.invalidResponse }
         case .text: guard prompt.acceptsText else { throw AgentRoutingError.invalidResponse }
+        case .answers(let answers): guard prompt.accepts(answers: answers) else { throw AgentRoutingError.invalidResponse }
         }
         guard !attempted.contains(id) else { throw AgentRoutingError.deliveryAlreadyAttempted }
         guard let kind = kinds[id], let adapter = adapters[kind], let route = routes[prompt.sessionID] else { throw AgentRoutingError.unavailable }
@@ -68,6 +75,7 @@ public actor AgentCoordinator {
             let receipt = try await adapter.respond(prompt: prompt, response: response)
             receipts[id] = receipt
             if receipt == .confirmed { queue.resolve(id) }
+            updateContinuation.yield(queue)
         } catch { throw error } // An exception after sending has unknown delivery; never auto retry.
     }
     private func check(_ route: AgentRoute, prompt: AgentPrompt, kind: AgentKind) throws {

@@ -21,6 +21,7 @@ private final class PromiseProviderBox: @unchecked Sendable {
 }
 
 @MainActor final class FileDropHostingView: NSHostingView<IslandRootView> {
+    var acceptsDragLocation: ((CGPoint) -> Bool)?
     var onDragActive: ((Bool) -> Void)?
     var onDropFiles: (([URL]) -> Void)?
     required init(rootView: IslandRootView) {
@@ -29,17 +30,22 @@ private final class PromiseProviderBox: @unchecked Sendable {
     }
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        guard !fileURLs(sender).isEmpty else { return [] }
+        guard accepts(sender), !fileURLs(sender).isEmpty else { return [] }
         onDragActive?(true)
         return .copy
     }
-    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { fileURLs(sender).isEmpty ? [] : .copy }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { accepts(sender) && !fileURLs(sender).isEmpty ? .copy : [] }
     override func draggingExited(_ sender: NSDraggingInfo?) { onDragActive?(false) }
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard accepts(sender) else { return false }
         let urls = fileURLs(sender)
         guard !urls.isEmpty else { return false }
         onDropFiles?(urls)
         return true
+    }
+    private func accepts(_ sender: NSDraggingInfo) -> Bool {
+        guard let point = window?.convertPoint(toScreen: sender.draggingLocation) else { return false }
+        return acceptsDragLocation?(point) ?? true
     }
     private func fileURLs(_ sender: NSDraggingInfo) -> [URL] {
         (sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
@@ -49,18 +55,20 @@ private final class PromiseProviderBox: @unchecked Sendable {
 struct FileDragSource: NSViewRepresentable {
     let item: ShelfItem
     let access: NativeFileAccess
+    let dragEnded: () -> Void
     let select: () -> Void
-    func makeNSView(context: Context) -> DragView { DragView(item: item, access: access, select: select) }
-    func updateNSView(_ view: DragView, context: Context) { view.item = item; view.select = select }
+    func makeNSView(context: Context) -> DragView { DragView(item: item, access: access, dragEnded: dragEnded, select: select) }
+    func updateNSView(_ view: DragView, context: Context) { view.item = item; view.select = select; view.dragEnded = dragEnded }
 }
 
 @MainActor final class DragView: NSView, NSDraggingSource, NSFilePromiseProviderDelegate {
     var item: ShelfItem
     let access: NativeFileAccess
     var select: () -> Void
+    var dragEnded: () -> Void
     private var activeAttempt: DragAttempt?
-    init(item: ShelfItem, access: NativeFileAccess, select: @escaping () -> Void) {
-        self.item = item; self.access = access; self.select = select
+    init(item: ShelfItem, access: NativeFileAccess, dragEnded: @escaping () -> Void, select: @escaping () -> Void) {
+        self.item = item; self.access = access; self.select = select; self.dragEnded = dragEnded
         super.init(frame: .zero)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
@@ -105,6 +113,7 @@ struct FileDragSource: NSViewRepresentable {
     func draggingSession(_ session: NSDraggingSession, endedAt point: NSPoint, operation: NSDragOperation) {
         guard let attempt = activeAttempt else { return }
         activeAttempt = nil
+        dragEnded()
         let wasConfirmed = attempt.gate.receipt == .confirmed
         let receipt = attempt.gate.end(acceptedCopy: operation.contains(.copy))
         if !wasConfirmed && receipt == .confirmed { access.finishDelivery(attempt.id, receipt: .confirmed) }

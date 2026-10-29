@@ -2,16 +2,23 @@ import AppKit
 import IslandCore
 
 @MainActor final class NativeSpotifyClient: SpotifyConsentClient {
+    private let worker = EventWorker()
+    private actor EventWorker {
+        func snapshot(_ client: SpotifyEventClient) throws -> SpotifySnapshot {
+            try Task.checkCancellation()
+            return try NativeSpotifyClient.readSnapshot(client)
+        }
+        func perform(_ command: SpotifyCommand, client: SpotifyEventClient) throws {
+            try Task.checkCancellation()
+            try NativeSpotifyClient.check(client.permission())
+            try NativeSpotifyClient.send(command, client: client)
+        }
+    }
     private func current() -> SpotifyEventClient? {
         NSRunningApplication.runningApplications(withBundleIdentifier: "com.spotify.client")
             .first.flatMap(SpotifyEventClient.init(application:))
     }
-    private func checked() throws -> SpotifyEventClient {
-        guard let client = current() else { throw SpotifyFailure.unavailable }
-        try Self.check(client.permission())
-        return client
-    }
-    static func check(_ status: OSStatus) throws {
+    nonisolated static func check(_ status: OSStatus) throws {
         switch status {
         case noErr: return
         case -1744: throw SpotifyFailure.requiresConsent
@@ -20,12 +27,16 @@ import IslandCore
         default: throw SpotifyFailure.commandFailed(Int(status))
         }
     }
-    private func read(_ client: SpotifyEventClient, _ code: UInt32, track: Bool = false) throws -> NSAppleEventDescriptor {
+    private nonisolated static func read(_ client: SpotifyEventClient, _ code: UInt32, track: Bool = false) throws -> NSAppleEventDescriptor {
+        try Task.checkCancellation()
         do { return try client.read(code, currentTrack: track) }
         catch { try Self.check(OSStatus((error as NSError).code)); throw error }
     }
     func snapshot() async throws -> SpotifySnapshot {
         guard let client = current() else { return SpotifySnapshot(availability: .unavailable) }
+        return try await worker.snapshot(client)
+    }
+    private nonisolated static func readSnapshot(_ client: SpotifyEventClient) throws -> SpotifySnapshot {
         let status = client.permission()
         if status == -1744 { return SpotifySnapshot(availability: .requiresConsent) }
         if status == -1743 { return SpotifySnapshot(availability: .denied) }
@@ -52,7 +63,10 @@ import IslandCore
                                artworkURL: art.flatMap(URL.init(string:)), position: position, duration: duration)
     }
     func perform(_ command: SpotifyCommand) async throws {
-        let client = try checked()
+        guard let client = current() else { throw SpotifyFailure.unavailable }
+        try await worker.perform(command, client: client)
+    }
+    private nonisolated static func send(_ command: SpotifyCommand, client: SpotifyEventClient) throws {
         let name: String
         switch command {
         case .toggle:

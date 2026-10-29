@@ -103,13 +103,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open Island"
+            "value": "Open Notchent"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Buka Island"
+            "value": "Buka Notchent"
           }
         }
       }
@@ -679,13 +679,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Discovery uses process metadata. Prompt reading and replies are not implemented; live verification is pending."
+            "value": "Codex requests show the actual daemon thread and project. Other agents currently support process discovery only."
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Deteksi memakai metadata proses. Pembacaan permintaan dan jawaban belum diimplementasikan; verifikasi langsung masih tertunda."
+            "value": "Permintaan Codex menampilkan thread dan proyek aslinya. Agent lain saat ini hanya mendukung deteksi proses."
           }
         }
       }
@@ -958,6 +958,502 @@
           "stringUnit": {
             "state": "translated",
             "value": "Jawaban ditolak. Periksa sesi asal."
+          }
+        }
+      }
+    },
+    "hide": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sembunyikan"
+          }
+        }
+      }
+    },
+    "noAgentSessions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No active agents"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum ada agent aktif"
+          }
+        }
+      }
+    },
+    "agentIntegrationPending": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local Codex service is not connected."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Layanan Codex lokal belum terhubung."
+          }
+        }
+      }
+    },
+    "codex_accept": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow once"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Izinkan sekali"
+          }
+        }
+      }
+    },
+    "codex_decline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deny"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tolak"
+          }
+        }
+      }
+    },
+    "codex_cancel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel turn"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batalkan giliran"
+          }
+        }
+      }
+    },
+    "codexMonitoring": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected to local Codex service · Experimental"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terhubung ke layanan Codex lokal · Eksperimental"
+          }
+        }
+      }
+    },
+    "codexRequestSupport": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verify the project shown with each request."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Periksa proyek yang ditampilkan pada setiap permintaan."
+          }
+        }
+      }
+    },
+    "codex_acceptForSession": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow for this session"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Izinkan selama sesi ini"
+          }
+        }
+      }
+    },
+    "codex_execPolicy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Don't ask again for commands starting with:"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jangan tanya lagi untuk perintah berawalan:"
+          }
+        }
+      }
+    },
+    "codex_networkAllow": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Always allow network access to:"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selalu izinkan akses jaringan ke:"
+          }
+        }
+      }
+    },
+    "codex_networkDeny": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Always deny network access to:"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selalu tolak akses jaringan ke:"
+          }
+        }
+      }
+    },
+    "externalHostOnly": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detected process · session connection unavailable"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Proses terdeteksi · koneksi sesi belum tersedia"
+          }
+        }
+      }
+    },
+    "sessionActivityUnknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity unavailable"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktivitas belum tersedia"
+          }
+        }
+      }
+    },
+    "sessionWorking": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Working"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sedang bekerja"
+          }
+        }
+      }
+    },
+    "sessionCompleted": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finished"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selesai"
+          }
+        }
+      }
+    },
+    "sessionInterrupted": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrupted"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dihentikan"
+          }
+        }
+      }
+    },
+    "sessionReadOnly": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session linked"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesi terhubung"
+          }
+        }
+      }
+    },
+    "desktopReplyUnavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue this conversation below. Live approval answers still require Codex."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lanjutkan percakapan ini di bawah. Jawaban izin langsung masih melalui Codex."
+          }
+        }
+      }
+    },
+    "chatPlaceholder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue this conversation…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lanjutkan percakapan ini…"
+          }
+        }
+      }
+    },
+    "chatSending": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mengirim…"
+          }
+        }
+      }
+    },
+    "chatQueued": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Queued in this conversation. Waiting for Codex to process it."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masuk antrean percakapan ini. Menunggu diproses Codex."
+          }
+        }
+      }
+    },
+    "chatUnknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delivery is uncertain. Check the original conversation before sending again."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengiriman belum pasti. Periksa percakapan asal sebelum mengirim lagi."
+          }
+        }
+      }
+    },
+    "chatUnavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat connection unavailable. Your draft is saved."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koneksi chat belum tersedia. Draf tetap tersimpan."
+          }
+        }
+      }
+    },
+    "chatSessionChanged": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session changed or closed. Your draft is saved."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesi berubah atau ditutup. Draf tetap tersimpan."
+          }
+        }
+      }
+    },
+    "chatRejected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex rejected this message. Your draft is saved."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex menolak pesan ini. Draf tetap tersimpan."
+          }
+        }
+      }
+    },
+    "chatUnlock": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I checked the conversation — unlock draft"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sudah periksa percakapan — buka draf"
+          }
+        }
+      }
+    },
+    "agentFinished": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent finished"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent selesai"
+          }
+        }
+      }
+    },
+    "hookAllow": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow once"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Izinkan sekali"
+          }
+        }
+      }
+    },
+    "hookDeny": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deny"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tolak"
+          }
+        }
+      }
+    },
+    "hookContinue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer in Codex"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jawab di Codex"
           }
         }
       }

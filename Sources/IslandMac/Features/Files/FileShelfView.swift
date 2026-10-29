@@ -9,7 +9,15 @@ struct FileShelfView: View {
     @ObservedObject var access: NativeFileAccess
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if access.items.isEmpty { Text(shell.text("shelfEmpty")).foregroundStyle(.secondary).frame(width: 520, alignment: .leading) }
+            if access.items.isEmpty {
+                HStack(spacing: 14) {
+                    Image(systemName: "tray").font(.system(size: 26, weight: .light)).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(shell.text("shelfEmpty")).font(.system(size: 15, weight: .medium))
+                        Text(shell.text("drop")).font(.caption).foregroundStyle(.secondary)
+                    }
+                }.frame(width: 520, height: 76, alignment: .leading)
+            }
             else {
                 ScrollView(.horizontal) {
                     HStack(spacing: 10) {
@@ -17,7 +25,7 @@ struct FileShelfView: View {
                             VStack(alignment: .leading, spacing: 5) {
                                 FileThumbnail(item: item, access: access)
                                     .frame(width: 64, height: 58)
-                                    .overlay(FileDragSource(item: item, access: access) { access.selected = item.id })
+                                    .overlay(FileDragSource(item: item, access: access, dragEnded: { shell.dispatch?(.shelfDragEnded) }) { access.selected = item.id })
                                 Text(item.displayName).font(.caption2).lineLimit(1).truncationMode(.middle)
                                     .help(item.displayName)
                                 if !item.isAvailable { Text(shell.text("shelfUnavailable")).font(.caption2).foregroundStyle(.orange) }
@@ -50,7 +58,7 @@ struct FileShelfSummary: View {
             if let error = access.error {
                 Text(error).font(.caption2).foregroundStyle(.red).lineLimit(2).help(error)
             }
-        }
+        }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
     }
 }
 

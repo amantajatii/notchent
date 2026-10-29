@@ -1,11 +1,12 @@
 import CoreGraphics
 
 public enum IslandFeature: String, CaseIterable, Sendable { case home, agents, music, files, terminal, settings }
-public enum IslandMode: Equatable, Sendable { case hidden, home, feature(IslandFeature), prompt, drop }
+public enum IslandMode: Equatable, Sendable { case hidden, mini, home, feature(IslandFeature), prompt, drop, completion }
 public enum IslandTimer: Equatable, Sendable { case open, close }
 public enum IslandEffect: Equatable, Sendable { case schedule(IslandTimer, token: UInt64, milliseconds: Int), cancelTimer }
 public enum IslandEvent: Sendable {
-    case pointerEntered, pointerExited, timer(IslandTimer, token: UInt64), show(IslandFeature), hide
+    case pointerEntered, pointerExited, timer(IslandTimer, token: UInt64), show(IslandFeature), reveal(IslandFeature), hide
+    case agentCompleted, filesDropped, shelfDragEnded
     case inputChanged(Bool), dragChanged(Bool), pendingChanged(Int), fullScreenChanged(Bool), openPrompt, closePrompt
 }
 public struct IslandState: Equatable, Sendable {
@@ -16,6 +17,7 @@ public struct IslandState: Equatable, Sendable {
     public var pendingCount = 0
     public var inputActive = false
     public var dragActive = false
+    public var filesPinned = false
     public var fullScreen = false
     public var pointerInside = false
     public var scheduledTransition: IslandTimer?
@@ -36,6 +38,8 @@ public enum IslandReducer {
         return [.schedule(kind, token: s.generation, milliseconds: kind == .open ? s.settings.openDelayMilliseconds : s.settings.closeDelayMilliseconds)]
     }
     private static func closeIfOutside(_ s: inout IslandState) -> [IslandEffect] {
+        if s.filesPinned { return cancel(&s) }
+        if s.mode == .prompt && s.pendingCount > 0 { return cancel(&s) }
         guard s.mode != .hidden, !s.pointerInside, !s.inputActive, !s.dragActive else { return cancel(&s) }
         return schedule(.close, &s)
     }
@@ -44,7 +48,7 @@ public enum IslandReducer {
         case let .timer(timer, token):
             guard token == s.generation, s.scheduledTransition == timer else { return [] }
             s.scheduledTransition = nil
-            if timer == .open, s.pointerInside, !s.dragActive, s.mode == .hidden { s.mode = .home }
+            if timer == .open, s.pointerInside, !s.dragActive, s.mode == .hidden { s.mode = .mini }
             if timer == .close, !s.pointerInside, !s.inputActive, !s.dragActive { s.mode = .hidden }
         case .pointerEntered:
             s.pointerInside = true
@@ -52,16 +56,34 @@ public enum IslandReducer {
         case .pointerExited:
             s.pointerInside = false
             return closeIfOutside(&s)
-        case let .show(feature):
+        case let .show(feature), let .reveal(feature):
             s.promptReturnMode = nil
             s.mode = feature == .home ? .home : .feature(feature)
+            if case .reveal = event, !s.pointerInside, !s.inputActive, !s.dragActive {
+                s.generation &+= 1
+                s.scheduledTransition = .close
+                return [.schedule(.close, token: s.generation, milliseconds: max(5000, s.settings.closeDelayMilliseconds))]
+            }
             return closeIfOutside(&s)
+        case .agentCompleted:
+            guard (s.mode == .hidden || s.mode == .completion), !s.inputActive, !s.dragActive,
+                  s.pendingCount == 0, !s.pointerInside,
+                  !s.fullScreen || s.settings.fullScreenPrompts == .automatic else { return [] }
+            s.mode = .completion
+            s.generation &+= 1; s.scheduledTransition = .close
+            return [.schedule(.close, token: s.generation, milliseconds: 5000)]
         case .hide:
-            if !s.inputActive && !s.dragActive { s.mode = .hidden; return cancel(&s) }
+            if !s.inputActive && !s.dragActive { s.filesPinned = false; s.mode = .hidden; return cancel(&s) }
+        case .filesDropped:
+            s.filesPinned = true; s.dragActive = false; s.mode = .feature(.files)
+            return cancel(&s)
+        case .shelfDragEnded:
+            if s.filesPinned { s.filesPinned = false; s.mode = .hidden; return cancel(&s) }
         case let .inputChanged(active):
             s.inputActive = active
             return active ? cancel(&s) : closeIfOutside(&s)
         case let .dragChanged(active):
+            if active { s.filesPinned = false }
             s.dragActive = active; s.mode = active ? .drop : .hidden
             return cancel(&s)
         case let .pendingChanged(count):

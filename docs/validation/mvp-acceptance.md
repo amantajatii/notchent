@@ -1,6 +1,6 @@
 # MVP acceptance — 2026-10-26
 
-Baseline source `ed5f662` plus perubahan dokumentasi/notice packaging Task 3. **Full MVP: NOT MET.** Khususnya kriteria 8–11 membutuhkan integrasi read/send CLI yang belum diimplementasikan. Build/test lokal tidak menggantikan acceptance native.
+Baseline dokumentasi Task 3 ditambah perubahan lokal hover/UI/discovery dan adapter Codex eksperimental. **Full MVP: NOT MET.** Koneksi daemon Codex tersedia, tetapi prompt/reply live dan tiga CLI lain belum terbukti/tersedia. Build/test lokal tidak menggantikan acceptance native.
 
 Status: **PASS** = seluruh klaim pada baris terbukti; **FAIL — not implemented** = kebutuhan belum tersedia; **UNVERIFIED** = implementasi ada tetapi bukti live yang diperlukan belum lengkap. Bukti parsial ditulis eksplisit, tidak dihitung sebagai PASS penuh.
 
@@ -14,9 +14,9 @@ Status: **PASS** = seluruh klaim pada baris terbukti; **FAIL — not implemented
 | 6 | Files thumbnail/nama; copy bertahan relaunch/restart | UNVERIFIED | FileShelf tests memakai filesystem nyata dan actor baru membuktikan copy/reload setelah sumber dihapus. Thumbnail/relaunch GUI belum diuji; restart Mac pending waktu pilihan pengguna. |
 | 7 | Sukses menghapus shelf; batal/gagal retain; asli aman | UNVERIFIED | Gate membutuhkan `.copy` + byte comparison; cancellation/order/unsafe deletion tests lulus. Handoff Finder nyata belum diuji; bukan receipt konsumsi aplikasi tujuan. |
 | 8 | Card agent beridentitas tepat pada kombinasi nyata | FAIL — not implemented | Metadata kandidat tersedia, stable pane eksternal tidak tersedia; tidak ada kombinasi CLI/host live yang terbukti. |
-| 9 | Pertanyaan otomatis FIFO + pending indicator | FAIL — not implemented | FIFO/revision/tombstone/indicator diuji sintetis; tidak ada pembacaan prompt CLI nyata. Codex app-server publik teridentifikasi, tetapi daemon uji tidak aktif dan belum ada uji runtime. |
-| 10 | Jawaban tepat sesi/permintaan; stale ditolak | FAIL — not implemented | Coordinator tests menguji typed identity, collision, permission race, dan no retry unknown. Adapter native read/send unavailable; Codex response path belum diverifikasi live. |
-| 11 | Banner saat mengetik tanpa focus theft; draft kembali | FAIL — not implemented | Banner/model route dan draft PTY nyata diuji. Sumber pertanyaan live tidak tersedia; interaksi keyboard/fokus GUI belum diamati. |
+| 9 | Pertanyaan otomatis FIFO + pending indicator | FAIL — partial support | Adapter Codex eksperimental menerima request protocol dan queue updates langsung. Native WebSocket dan replay command-approval sekarang teramati; screenshot pengguna membuktikan prompt muncul di island. Adapter opsi terstruktur diperbaiki setelah screenshot menunjukkan pilihan aturan hilang. Tiga CLI lain belum didukung. |
+| 10 | Jawaban tepat sesi/permintaan; stale ditolak | FAIL — partial support | Identitas koneksi/daemon/thread + raw JSON request ID dipertahankan; reply satu kali tanpa retry; scoped tests lulus. Pengiriman jawaban manusia dan hasil pada CLI belum diverifikasi. CLI lain unavailable. |
+| 11 | Banner saat mengetik tanpa focus theft; draft kembali | UNVERIFIED | Banner/reducer/PTY diuji; adapter Codex dan publisher queue terpasang. Interaksi keyboard/fokus dengan prompt nyata di GUI belum diamati. |
 | 12 | Full-screen default indikator; setting mengubah perilaku | UNVERIFIED | Reducer/classifier tests lulus, monitor konservatif terpasang. Full-screen/Spaces native belum diamati. |
 | 13 | Terminal hidup saat Hide/pindah tab | UNVERIFIED | Real-PTY integration membuktikan view/session/draft retention serta controlled close/escalation/quit barrier. Hide/tab/resize GUI dan supported CLI di app belum diuji live. |
 | 14 | English default; Indonesia persisten; isi asli tetap | UNVERIFIED | Settings persistence dan bundle en/id verified. Root pernah mengganti English → Indonesia → English di UI awal. Semua route compact, terminal/file dan relaunch locale build terbaru belum diamati. |

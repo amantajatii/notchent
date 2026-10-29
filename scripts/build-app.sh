@@ -2,21 +2,24 @@
 set -eu
 cd "$(dirname "$0")/.."
 case "${1:-}" in
-  '') product=IslandMac; plist=Resources/App-Info.plist ;;
-  --probe) product=IslandProbe; plist=Resources/Probe-Info.plist ;;
+  '') product=IslandMac; app_name=Notchent; plist=Resources/App-Info.plist ;;
+  --probe) product=IslandProbe; app_name=IslandProbe; plist=Resources/Probe-Info.plist ;;
   *) echo 'Usage: scripts/build-app.sh [--probe]' >&2; exit 2 ;;
 esac
 swift build --build-system native --product "$product"
 bin_dir=$(swift build --build-system native --show-bin-path)
-app=".build/apps/$product.app"
+app=".build/apps/$app_name.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin_dir/$product" "$app/Contents/MacOS/$product"
 cp "$plist" "$app/Contents/Info.plist"
 if [ "$product" = IslandMac ]; then
+  swift build --build-system native --product IslandHook
+  cp "$bin_dir/IslandHook" "$app/Contents/MacOS/IslandHook"
+  codesign --force --sign - --identifier dev.nativeisland.hook "$app/Contents/MacOS/IslandHook"
   swift scripts/export-localizations.swift Sources/IslandMac/Resources/Localizable.xcstrings "$app/Contents/Resources"
   # SwiftTerm is statically linked; its MIT notice must accompany the app.
   mkdir -p "$app/Contents/Resources/ThirdPartyNotices"
-  cp .build/checkouts/SwiftTerm/LICENSE "$app/Contents/Resources/ThirdPartyNotices/SwiftTerm-LICENSE.txt"
+  cp -f .build/checkouts/SwiftTerm/LICENSE "$app/Contents/Resources/ThirdPartyNotices/SwiftTerm-LICENSE.txt"
 fi
 codesign --force --sign - --identifier "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Contents/Info.plist")" "$app"
 echo "$app"
