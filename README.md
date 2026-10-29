@@ -2,13 +2,13 @@
 
 **Notch for Agent.**
 
-Panel native di notch Mac untuk memantau coding agent, menerima notifikasi, dan melanjutkan percakapan yang didukung.
+A native Mac notch companion for monitoring coding agents, receiving notifications, and continuing supported conversations.
 
-Aplikasi menu bar native untuk panel Home, Spotify, Files, dan terminal internal. Minimum macOS 14. **MVP belum lengkap:** membaca pertanyaan dan mengirim jawaban CLI nyata belum diimplementasikan. Bukti lengkap: [acceptance](docs/validation/mvp-acceptance.md).
+Notchent is a native menu bar app with Home, Spotify, Files, and an integrated terminal. Requires macOS 14 or later. **The MVP is incomplete:** agent support and live validation vary by integration, as detailed below. See the [acceptance record](docs/validation/mvp-acceptance.md) for validation evidence.
 
-## Build dan buka
+## Build and launch
 
-Dari root repository, dengan Apple Command Line Tools aktif:
+From the repository root, with Apple Command Line Tools active:
 
 ```sh
 scripts/test.sh
@@ -16,55 +16,68 @@ scripts/build-app.sh
 open .build/apps/Notchent.app
 ```
 
-Nama produk: **Notchent**. Target Swift `IslandMac`, bundle ID, dan lokasi data lama dipertahankan agar integrasi dan data pengguna tetap kompatibel.
+The product name is **Notchent**. The Swift target `IslandMac`, bundle ID, and existing storage paths are retained for compatibility with existing integrations and user data.
 
-Artifact: `.build/apps/Notchent.app` (debug, ad-hoc signed, bundle ID `dev.nativeisland.app`). Belum dinotariskan atau diverifikasi untuk distribusi eksternal. Build mengikuti arsitektur mesin; baseline lokal arm64, macOS 27.0.1, Swift 6.4. SwiftTerm dipin tepat `1.99.1` melalui `Package.resolved`; compiler yang memahami manifest SwiftTerm (tools 6.2+) diperlukan.
+Build output: `.build/apps/Notchent.app` (debug, ad-hoc signed, bundle ID `dev.nativeisland.app`). The app has not been notarized or validated for external distribution. Builds use the host architecture; the local baseline is arm64, macOS 27.0.1, and Swift 6.4. SwiftTerm is pinned to exactly `1.99.1` through `Package.resolved`; a compiler that supports its manifest (Swift tools 6.2+) is required.
 
-Pada CLT 6.4 ini, `swift test` biasa gagal menemukan framework testing. `scripts/test.sh` memakai Swift Testing, `--disable-xctest`, framework search path/rpath CLT, dan native build engine. Warning deprecation native engine masih ada; belum dimigrasikan atau disembunyikan.
+With the local CLT 6.4 setup, plain `swift test` cannot find the testing framework. `scripts/test.sh` uses Swift Testing, `--disable-xctest`, the CLT framework search path/rpath, and the native build engine. The native engine deprecation warning remains; it has not been migrated or suppressed.
 
-Untuk upgrade, pilih **Quit** pada instance lama terlebih dahulu, selesaikan konfirmasi sesi milik app, lalu build dan jalankan `open` di atas. Membuka bundle yang app-nya masih berjalan tidak memuat ulang binary baru. Build sendiri juga tidak me-restart app. Launch normal menyembunyikan panel saat idle; hover tengah atas membuka panel. Jangan gunakan `--show` untuk pemakaian normal karena mode inspeksi itu mempertahankan panel terbuka.
+To upgrade, choose **Quit** in the old instance first, complete any confirmation for app-owned sessions, then build and run the `open` command above. Opening a bundle while its app is already running does not reload the new binary. Building also does not restart the app. During normal use, the panel hides when idle; hover over the top center of the screen to open it. Avoid `--show` for normal use: that inspection mode keeps the panel open.
 
-## Pemakaian dan izin
+## Usage and permissions
 
-Home mengutamakan Music/Spotify dengan ringkasan Agents dan Files. Settings menyimpan Language (English default atau Bahasa Indonesia), Open delay, Close delay, Full screen, dan File storage. Teks terminal, nama file, serta isi permintaan agent tidak diterjemahkan.
+Home prioritizes Music/Spotify, with summaries for Agents and Files. Settings stores Language (English by default, or Bahasa Indonesia), Open delay, Close delay, Full screen, and File storage. Terminal text, filenames, and agent request contents are not translated.
 
-Buka Spotify sendiri, lalu gunakan **Connect Spotify** ketika ingin memberikan izin Automation. macOS dapat meminta persetujuan; pengguna menentukan izinnya melalui dialog atau System Settings → Privacy & Security → Automation. Polling tidak meminta izin diam-diam dan tidak memulai Spotify/musik. Status consent/denied/unavailable berbeda. Metadata, artwork, serta tombol playback belum diverifikasi live pada bundle terbaru. Tidak perlu memberikan Accessibility atau Screen Recording untuk membuka panel; memberikan izin tambahan tidak mengaktifkan fitur jawaban agent yang belum ada.
+Open Spotify yourself, then use **Connect Spotify** when you want to grant Automation permission. macOS may ask for approval; you control access through the dialog or System Settings → Privacy & Security → Automation. Polling does not silently request permission or launch Spotify or music playback. Consent, denied, and unavailable states are distinct. Metadata, artwork, and playback controls have not been verified live on the latest bundle. Opening the panel does not require Accessibility or Screen Recording permission; additional permissions do not enable unimplemented agent response features.
 
-Files menerima file reguler; direktori dan symlink ditolak. **Copy** menyimpan salinan milik app di `~/Library/Application Support/IslandMac/FileShelf`; **Reference** menyimpan bookmark ke file asli dan dapat menjadi unavailable ketika sumber hilang/tidak dapat diakses. Tidak ada batas kuota aplikasi yang dijanjikan; kapasitas disk dan izin tetap membatasi import. Hindari menganggap titipan sebagai backup.
+Files accepts regular files; directories and symlinks are rejected. **Copy** stores an app-owned copy in `~/Library/Application Support/IslandMac/FileShelf`; **Reference** stores a bookmark to the original and may become unavailable if the source disappears or cannot be accessed. No application storage quota is promised; disk space and permissions still limit imports. Do not treat the shelf as a backup.
 
-Drag masuk menampilkan area drop. Penerimaan drop oleh AppKit terjadi sebelum import asinkron selesai; periksa item atau pesan gagal sebelum menganggap file tersimpan. Drag keluar memakai file promise: penghapusan titipan memerlukan hasil native `.copy` dan perbandingan byte tujuan yang berhasil. Cancel/gagal/hasil tidak pasti mempertahankan item; Remove hanya menghapus salinan milik app atau referensi, tidak menghapus file asli. Ini verifikasi sisi produsen, belum bukti bahwa semua aplikasi tujuan sudah mengonsumsi file. Finder drag dan restart Mac masih menunggu pengujian live.
+Dragging files in displays the drop area. AppKit accepts the drop before the asynchronous import completes; check the item or error message before assuming the file was saved. Dragging out uses file promises: removing a shelf item requires a native `.copy` result and a successful byte comparison with the destination. Canceled, failed, or uncertain deliveries retain the item. **Remove** deletes only the app-owned copy or reference, never the original file. This is verification on the producer side, not proof that every destination app has consumed the file. Finder dragging and behavior after restarting the Mac still require live testing.
 
-Terminal: pilih folder untuk membuat sesi shell. **Hide** menyembunyikan panel dan mempertahankan PTY/draft; pindah tab juga mempertahankannya. **Close** meminta penghentian sesi milik app tersebut, secara asinkron. **Quit** meminta konfirmasi bila sesi milik app masih berjalan dan menunggu penghentiannya; sesi eksternal berada di luar store. GUI konfirmasi/fokus belum diverifikasi live pada build terbaru. Jangan Quit hanya untuk pengujian bila ada pekerjaan terminal yang ingin dipertahankan.
+For Terminal, choose a folder to create a shell session. **Hide** hides the panel while preserving the PTY and draft; switching tabs preserves them too. **Close** requests asynchronous termination of that app-owned session. **Quit** asks for confirmation when app-owned sessions are running and waits for termination; external sessions are outside the store. Confirmation and focus behavior have not been verified live on the latest build. Avoid quitting just to test if you have terminal work to preserve.
 
-## Dukungan agent saat ini
+## Current agent support
 
-| CLI | Nama executable yang dicari | Discovery | Baca pertanyaan / kirim jawaban |
+| CLI | Executable detected | Discovery | Read questions / send answers |
 | --- | --- | --- | --- |
-| Codex CLI | `codex` | Metadata kandidat | Pertanyaan tunggal dengan jawaban teks lewat daemon lokal terbukti pada satu uji terkontrol; izin perintah dan kombinasi lain belum terbukti |
-| Claude Code | `claude` | Metadata kandidat | Belum diimplementasikan |
-| Antigravity CLI | `agy` | Metadata kandidat | Belum diimplementasikan |
-| Oh My Pi | `omp` | Metadata kandidat | Belum diimplementasikan |
+| Codex CLI | `codex` | Candidate metadata | A single question with a text answer through the local daemon was verified in one controlled test; command approvals and other combinations remain unverified |
+| Claude Code | `claude` | Candidate metadata | Not implemented |
+| Antigravity CLI | `agy` | Candidate metadata | Not implemented |
+| Oh My Pi | `omp` | Candidate metadata | Not implemented |
 
-Semua baris memiliki batas yang sama: keturunan shell internal dipetakan memakai PID/birth time ke terminal milik app. Wrapper interpreter dapat terlewat. Host eksternal VS Code, Orca, Terminal, dan iTerm2 dikenali lewat ancestry; sesi Codex desktop dibaca melalui berkas rollout yang sedang dibuka proses (metadata, aktivitas, ringkasan selesai; baca-saja), tanpa scan riwayat atau perubahan hook/config; pane/proyek stabil belum diketahui, sehingga tidak ada pemetaan pane atau Open origin eksternal. Adapter Codex memakai identitas thread daemon, bukan identitas pane Terminal. Satu sesi uji Codex CLI melalui daemon bersama sudah membuktikan pertanyaan dan jawaban teks live; ini tidak memvalidasi seluruh 16 kombinasi CLI/host. Versi inventaris historis ada di [agent-capabilities](docs/validation/agent-capabilities.md), bukan janji kompatibilitas.
+All entries share these limits: descendants of internal shells are mapped to app-owned terminals using PID and process birth time. Interpreter wrappers may be missed. External VS Code, Orca, Terminal, and iTerm2 hosts are recognized through process ancestry. Codex desktop sessions are read through rollout files currently open by the process (metadata, activity, and completion summaries; read-only), without scanning history or changing hooks/configuration. Stable pane/project identity is not known, so external pane mapping and Open origin are unavailable. The Codex adapter uses daemon thread identity rather than Terminal pane identity. One Codex CLI session through a shared daemon has demonstrated live questions and text answers; this does not validate all 16 CLI/host combinations. Historical version inventory is in [agent capabilities](docs/validation/agent-capabilities.md), not a compatibility guarantee.
 
-Adapter Codex kini terhubung ke WebSocket publik daemon lokal yang sudah berjalan, menampilkan permintaan dengan nama thread/proyek, dan hanya mengirim jawaban setelah klik pengguna. Semua jenis keputusan izin perintah yang ditawarkan protokol versi ini dipertahankan sesuai urutan: sekali jalan, selama sesi, aturan awalan perintah, aturan host jaringan, penolakan, atau pembatalan. Opsi sesi/aturan hanya tampil bila dikirim Codex dan cakupannya tertulis pada tombol. Pertanyaan nonrahasia tunggal atau sampai tiga pertanyaan sekaligus didukung; file-change/permissions dan MCP elicitation belum didukung lewat adapter daemon. Protokol framing/routing dan koneksi native initialize/loaded-list sudah diuji, dan replay izin perintah serta tampilannya di island sudah diamati untuk Codex/Terminal. Satu uji terkontrol sudah memverifikasi pengiriman jawaban teks melalui UI island dan hasil yang sama di CLI; jawaban izin perintah belum diverifikasi live. Tulisan terkirim bukan konfirmasi jawaban diterima; resolved dari server menghapus prompt, termasuk jika dijawab dari asalnya. Status aktivitas pada card proses tetap unknown. Pemindaian dasar tidak memasang hook/plugin atau mengubah konfigurasi CLI/shell. Popup desktop lokal dapat memakai hook opsional yang dipasang hanya setelah izin pengguna. Bila pengguna memilih opsi aturan permanen, Codex dapat menyimpan aturan melalui mekanismenya sendiri; app tidak memilih opsi itu otomatis.
+The Codex adapter connects to the public WebSocket endpoint of an already running local daemon, displays requests with thread/project names, and sends answers only after a user click. It preserves all command approval decisions offered by this protocol version, in their original order: run once, allow for the session, command prefix rules, network host rules, denial, or cancellation. Session/rule options appear only when Codex supplies them, with their scope shown on the button. Single non-secret questions and batches of up to three questions are supported; file-change/permissions requests and MCP elicitation are not supported through the daemon adapter.
 
-Adapter mengamati thread yang masih loaded dan aktif melalui daemon milik pengguna yang sudah berjalan, tanpa mensyaratkan proses Codex ber-TTY. Sesi daemon terverifikasi ditampilkan sebagai card terpisah dari kandidat proses. Subscription memakai thread/resume tanpa config override, mengecek loaded sebelum/sesudah, lalu dilepas saat idle/keluar. Protokol tidak menyediakan join yang atomik terhadap unload; race tersebut belum terbukti aman live. Resume juga mengubah atribusi client daemon dan dapat memperpanjang masa loaded thread selama dipantau. Tidak membaca riwayat percakapan atau output terminal.
+Protocol framing/routing and native initialize/loaded-list connections have been tested. Command approval replay and its panel presentation have been observed for Codex/Terminal. One controlled test verified sending a text answer through the notch UI and receiving the same value in the CLI; command approval responses have not been verified live. A sent status does not confirm receipt. A resolved event from the server removes the prompt, including when answered at its origin. Activity status on process cards remains unknown.
 
-Di Agents, pilih sesi Codex lalu gunakan kolom chat untuk melanjutkan percakapan yang sama. Enter atau tombol panah mengantrekan teks melalui thread/queue/add dengan UUID sesi tersebut; tidak membuat atau me-resume percakapan pada server lain. Status queued berarti antrean diterima, bukan balasan sudah selesai. Draf disimpan per sesi. Jika hasil pengiriman tidak pasti, periksa percakapan asal sebelum membuka draf untuk mengirim lagi. Balasan selesai mengikuti pemantauan ringkasan lokal; streaming dan jawaban izin desktop belum tersedia. Pengiriman manusia sampai benar-benar diproses Codex belum diverifikasi end-to-end.
+Basic discovery does not install hooks/plugins or modify CLI/shell configuration. Local desktop popups can use optional hooks installed only with user permission. If the user selects a persistent rule option, Codex may save the rule through its own mechanisms; the app never chooses that option automatically.
 
+The adapter observes loaded, active threads through the user's existing daemon without requiring a Codex process with a TTY. Verified daemon sessions appear as separate cards from process candidates. Subscriptions use thread/resume without configuration overrides, check loaded state before and after, and detach when idle or exiting. The protocol does not provide an atomic join against unload; that race has not been verified safe live. Resume also changes daemon client attribution and may keep a monitored thread loaded longer. This subscription path does not read conversation history or terminal output.
 
-Hook pertanyaan Codex lokal sudah didukung. `scripts/build-app.sh` juga mengemas helper native IslandHook. Installer `python3 scripts/install-codex-hook.py --helper .build/apps/Notchent.app/Contents/MacOS/IslandHook` menambahkan handler PermissionRequest dan PreToolUse khusus pertanyaan ke `~/.codex/hooks.json`, menyimpan backup, dan mempertahankan handler lain. Setelah pemasangan, review dan trust definisi IslandMac lewat `/hooks` di Codex CLI. Installer tidak mengubah catatan trust atau mode keamanan. Permission menawarkan izinkan sekali, tolak, atau lanjutkan di Codex. Preferensi desktop hanya dipratinjau dan diteruskan ke UI asli; PreToolUse tidak dapat mengembalikan jawaban tool. Cloud-orchestrated Work tidak mendukung semua hook lokal ini.
+In Agents, select a Codex session and use the chat field to continue the same conversation. Enter or the arrow button queues text through thread/queue/add using that session's UUID; it does not create or resume a conversation on another server. Queued means the queue accepted the message, not that a reply is complete. Drafts are stored per session. If delivery is uncertain, check the original conversation before reopening the draft to send it again. Completed replies follow local summary monitoring; streaming and desktop approval responses are unavailable. Delivery through to actual processing by Codex has not been verified end to end.
 
-Area drop sekarang terbuka saat file mulai diseret di mana pun pada layar, tanpa harus hover tepi atas. Area tetap terbuka selama drag dan menutup setelah file dilepas/dibatalkan. Data file lama di drag pasteboard dan drag teks tidak membuka island.
+### Optional local Codex hooks
 
-### Menjawab pertanyaan Codex melalui island
+Local Codex question hooks are supported. `scripts/build-app.sh` also bundles the native IslandHook helper. The installer below adds PermissionRequest and question-specific PreToolUse handlers to `~/.codex/hooks.json`, saves a backup, and preserves other handlers:
 
-Jalankan sesi CLI pada daemon yang sama dengan Notchent:
+```sh
+python3 scripts/install-codex-hook.py --helper .build/apps/Notchent.app/Contents/MacOS/IslandHook
+```
+
+After installation, review and trust the IslandMac definitions through `/hooks` in Codex CLI. The installer does not modify trust records or security mode. Permission prompts offer allow once, deny, or continue in Codex. Desktop preferences are previewed and handed off to the original UI; PreToolUse cannot return tool answers. Cloud-orchestrated Work does not support all of these local hooks.
+
+### File drag activation
+
+The drop area opens when a file drag starts anywhere on screen, without requiring a hover at the top edge. It stays open during the drag and closes after the file is released or the drag is canceled. Stale file data on the drag pasteboard and text drags do not open the panel.
+
+### Answering Codex questions through the notch
+
+Run the CLI session on the same daemon as Notchent:
 
 ```sh
 codex app-server daemon start
 codex --remote unix://
 ```
 
-Saat Codex mengajukan pertanyaan, jawab pada panel prompt island. Jika hook opsional lebih dahulu menampilkan **Answer in Codex**, tekan tombol itu untuk melewatkan preview; pertanyaan resmi dari daemon kemudian menyediakan pilihan/kolom jawaban dan **Send** di island. Uji terkontrol 2026-10-29 membuktikan teks `ISLAND_TEXT_OK` dikirim dari island dan diterima CLI. Ini tidak menghubungkan dialog sesi desktop yang memakai server stdio terpisah.
+When Codex asks a question, answer in the notch prompt panel. If the optional hook shows **Answer in Codex** first, press it to skip the preview; the official daemon question then provides choices or a text field and **Send** in the panel. A controlled test on 2026-10-29 verified that `ISLAND_TEXT_OK` was sent from the panel and received by the CLI. This does not connect desktop session dialogs that use a separate stdio server.
