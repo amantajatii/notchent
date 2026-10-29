@@ -169,3 +169,12 @@ A disposable read-only Codex CLI 0.164.0 session connected using `codex --remote
 A fresh AX snapshot confirmed the exact test question before entering `ISLAND_TEXT_OK` in the island text field. Send became enabled; clicking it cleared the pending prompt. The original CLI left its question UI and subsequently printed `ISLAND_TEXT_OK`. This verifies a real model-issued request → island input → protocol response → original CLI result for one controlled single-question case, rather than a fixture or chat-queue acknowledgement. The completed test CLI was disconnected normally. No files were changed by that test session.
 
 This does not establish delivery for private-stdio desktop questions, asynchronous desktop questions, grouped questions, secret input, permissions, or reconnect/stale-request races. The hook preview still adds an extra handoff step before the daemon question. Starting a separate daemon alone does not attach it to a running desktop server.
+
+
+## Chat composer follow-up — 2026-10-29
+
+The composer uses a native text editor for image paste, shows attachment previews with removal controls, and enables a white send button for a valid draft while connected. Image-only messages use the installed Codex schema's `image` input with a PNG data URL. The existing 4 MB transport limit is enforced before sending.
+
+Queue-confirmed messages remain in per-session in-memory history while awaiting a server echo. Server `clientId` matches the submitted client message ID; identical text sent twice remains two separate messages. History refreshes after queue confirmation, completion metadata changes, and completed-item/turn notifications. Uncertain delivery still keeps the draft locked against automatic retries.
+
+Regression tests cover queue/history reconciliation, image-only payloads and acknowledgements, oversized/invalid inputs, native image paste, text editing, and image-only rollout history. These local checks do not establish live image delivery or processing by Codex.

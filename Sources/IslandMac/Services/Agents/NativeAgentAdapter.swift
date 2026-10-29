@@ -21,6 +21,7 @@ struct NativeAgentAdapter: AgentAdapter {
     @Published private(set) var submitted = Set<PromptID>()
     @Published private(set) var codexConnected = false
     @Published private(set) var completion: DiscoveredAgent?
+    @Published private(set) var chatRevisions: [String: Int] = [:]
     @Published var selectedAgentID: String?
     var completionChanged: (() -> Void)?
     private var completions = AgentCompletionTracker()
@@ -58,6 +59,7 @@ struct NativeAgentAdapter: AgentAdapter {
                 unmappedCount = found.count - local.count
                 await codex.refresh(records: records)
                 codexConnected = await codex.isConnected
+                chatRevisions = await codex.chatRevisions
                 let monitored = await codex.monitoredAgents
                 let monitoredIDs = Set(monitored.compactMap { $0.sessionID?.terminalSessionKey })
                 let observedPIDs = Set(observed.map(\.pid))
@@ -77,10 +79,11 @@ struct NativeAgentAdapter: AgentAdapter {
     }
     func readChat(for session: SessionID) async throws -> [AgentChatEntry] {
         guard agents.contains(where: { $0.sessionID == session && $0.kind == .codex }) else { throw AgentRoutingError.unavailable }
-        if session.ownerInstanceID == "codex-observed" {
+        do { return try await codex.readChat(session: session) }
+        catch {
+            guard session.ownerInstanceID == "codex-observed" else { throw error }
             return try await Task.detached { try CodexSessionObserver.readChat(session: session) }.value
         }
-        return try await codex.readChat(session: session)
     }
     func sendChat(to session: SessionID) {
         let draft = chatDraft(for: session)
@@ -95,8 +98,7 @@ struct NativeAgentAdapter: AgentAdapter {
                 guard message.acknowledged(by: response) else {
                     draft.uncertain = true; draft.status = "chatUnknown"; return
                 }
-                if draft.text == message.text { draft.text = "" }
-                draft.status = "chatQueued"
+                draft.recordQueued(message)
             } catch let error as AgentRoutingError {
                 draft.status = error == .identityChanged ? "chatSessionChanged" : "chatUnavailable"
             } catch CodexSocket.Failure.rpcRejected {

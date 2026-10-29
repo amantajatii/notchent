@@ -38,6 +38,11 @@ struct CodexSessionObserverTests {
         let context = try line("response_item", ["type": "message", "role": "user", "content": [["type": "input_text", "text": "<environment_context>private</environment_context>"], ["type": "input_text", "text": "Actual request"]]])
         #expect(CodexSessionObserver.chatEntry(line: context, index: 4)?.text == "Actual request")
     }
+    @Test func imageOnlyUserMessagesAreIncludedInLocalHistory() throws {
+        let user = try line("response_item", ["id": "image-message", "type": "message", "role": "user", "content": [["type": "input_image", "image_url": "data:image/png;base64,test"]]])
+        let entry = try #require(CodexSessionObserver.chatEntry(line: user, index: 0))
+        #expect(entry.id == "image-message" && entry.images.count == 1 && entry.text.isEmpty)
+    }
     @Test func lateCompletionCannotFinishANewerTurn() throws {
         let header = try line("session_meta", ["id": id, "cwd": "/projects/example"])
         let started = try line("event_msg", ["type": "task_started", "turn_id": "new"])

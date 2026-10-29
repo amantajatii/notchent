@@ -1282,6 +1282,38 @@
         }
       }
     },
+    "chatRemoveImage": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove image"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hapus gambar"
+          }
+        }
+      }
+    },
+    "chatImageTooLarge": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Image could not be attached. Try a smaller image; attachments must fit within the 4 MB message limit."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gambar tidak dapat dilampirkan. Coba gambar lebih kecil; lampiran harus muat dalam batas pesan 4 MB."
+          }
+        }
+      }
+    },
     "chatSending": {
       "localizations": {
         "en": {

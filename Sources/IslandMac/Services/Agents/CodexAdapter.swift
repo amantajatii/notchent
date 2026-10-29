@@ -142,6 +142,7 @@ actor CodexAdapter: AgentAdapter {
     private var pending: [PromptID: CodexPendingRequest] = [:]
     private var submitted = Set<PromptID>()
     private var resolved = Set<PromptID>()
+    private(set) var chatRevisions: [String: Int] = [:]
     private var refreshing = false
     private let hookMailbox = CodexHookMailbox()
     private var hookPending: [PromptID: CodexHookPending] = [:]
@@ -354,6 +355,9 @@ actor CodexAdapter: AgentAdapter {
         guard token == connectionID, let value = try? object(data), let method = value["method"] as? String,
               let params = value["params"] as? [String: Any], let id = params["threadId"] as? String,
               let session = sessions[id] else { return }
+        if ["item/completed", "turn/completed"].contains(method) {
+            chatRevisions[id, default: 0] += 1
+        }
         if method == "serverRequest/resolved", let raw = params["requestId"], let rawID = CodexPendingRequest.requestID(raw) {
             let promptID = PromptID(sessionID: session, localRequestID: rawID.base64EncodedString())
             pending.removeValue(forKey: promptID)
