@@ -26,6 +26,8 @@ To upgrade, choose **Quit** in the old instance first, complete any confirmation
 
 ## Usage and permissions
 
+Enable **Launch at Login** in Settings to start Notchent automatically after signing in to macOS. The toggle reads the system Login Items status. If macOS requires approval, use **Open Login Items** to finish enabling it in System Settings. Turning the toggle off removes the login registration without quitting Notchent. Keep the app bundle in a stable location before enabling this; deleting the debug build also removes the bundle needed at login. The app does not enable this option automatically.
+
 Home prioritizes Music/Spotify, with summaries for Agents and Files. Settings stores Language (English by default, or Bahasa Indonesia), Open delay, Close delay, Full screen, and File storage. Terminal text, filenames, and agent request contents are not translated.
 
 Open Spotify yourself, then use **Connect Spotify** when you want to grant Automation permission. macOS may ask for approval; you control access through the dialog or System Settings → Privacy & Security → Automation. Polling does not silently request permission or launch Spotify or music playback. Consent, denied, and unavailable states are distinct. Metadata, artwork, and playback controls have not been verified live on the latest bundle. Opening the panel does not require Accessibility or Screen Recording permission; additional permissions do not enable unimplemented agent response features.

@@ -29,6 +29,7 @@ import IslandCore
     let files = NativeFileAccess()
     let terminals = TerminalSessionStore()
     let agents = AgentRegistry()
+    let launchAtLogin = LaunchAtLoginStore()
     init(store: SettingsStore = SettingsStore(), localizations: Bundle = .main) {
         self.store = store
         self.localizations = localizations
@@ -43,7 +44,12 @@ import IslandCore
 
 @main struct IslandApp: App {
     @NSApplicationDelegateAdaptor(IslandAppDelegate.self) var delegate
-    var body: some Scene { Settings { EmptyView() } }
+    var body: some Scene {
+        Settings {
+            SettingsView(shell: delegate.shell, launchAtLogin: delegate.shell.launchAtLogin)
+                .padding(20).preferredColorScheme(.dark)
+        }
+    }
 }
 
 @MainActor final class IslandAppDelegate: NSObject, NSApplicationDelegate {

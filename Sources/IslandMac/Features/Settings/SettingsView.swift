@@ -1,8 +1,10 @@
+import AppKit
 import SwiftUI
 import IslandCore
 
 struct SettingsView: View {
     @ObservedObject var shell: IslandShell
+    @ObservedObject var launchAtLogin: LaunchAtLoginStore
     var body: some View {
         VStack(spacing: 0) {
             row(shell.text("language")) {
@@ -10,6 +12,21 @@ struct SettingsView: View {
                     Text("English").tag(IslandLanguage.en)
                     Text("Bahasa Indonesia").tag(IslandLanguage.id)
                 }.labelsHidden().frame(width: 180)
+            }
+            row(shell.text("launchAtLogin")) {
+                Toggle(shell.text("launchAtLogin"), isOn: Binding(
+                    get: { launchAtLogin.isOn }, set: { launchAtLogin.setEnabled($0) }
+                )).labelsHidden().toggleStyle(.switch)
+            }
+            if launchAtLogin.status == .requiresApproval {
+                HStack {
+                    Text(shell.text("loginApprovalRequired")).font(.caption).foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
+                    Button(shell.text("openLoginItems")) { launchAtLogin.openSystemSettings() }.font(.caption)
+                }.padding(.bottom, 8)
+            }
+            if launchAtLogin.failed {
+                Text(shell.text("loginRegistrationError")).font(.caption).foregroundStyle(.red).padding(.bottom, 8)
             }
             row(shell.text("openDelay")) {
                 Stepper(value: $shell.settings.openDelayMilliseconds, in: 0...5000, step: 50) {
@@ -35,6 +52,10 @@ struct SettingsView: View {
             }
             if let error = shell.persistenceError { Text(error).font(.caption).foregroundStyle(.red) }
         }.frame(width: 540)
+            .onAppear { launchAtLogin.refresh() }
+            .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)) { _ in
+                launchAtLogin.refresh()
+            }
     }
     private func row<Control: View>(_ title: String, @ViewBuilder control: () -> Control) -> some View {
         HStack(spacing: 16) {

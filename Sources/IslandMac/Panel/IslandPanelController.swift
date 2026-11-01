@@ -340,7 +340,7 @@ struct IslandRootView: View {
         let feature = selectedFeature
         if let native = shell.retainedNativeViews[feature] { RetainedNativeView(view: native) }
         else if let view = shell.featureViews[feature] { view }
-        else if feature == .settings { SettingsView(shell: shell) }
+        else if feature == .settings { SettingsView(shell: shell, launchAtLogin: shell.launchAtLogin) }
         else if feature == .home { HomeView(shell: shell, spotify: shell.spotify) }
         else if feature == .music { MusicView(shell: shell, spotify: shell.spotify) }
         else {
