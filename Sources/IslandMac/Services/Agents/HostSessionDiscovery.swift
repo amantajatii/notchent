@@ -81,7 +81,8 @@ struct HostSessionDiscovery {
     }
     static func discover(records: [ProcessRecord], owned: [SessionID]) -> [DiscoveredAgent] {
         let byPID = Dictionary(records.map { ($0.pid, $0) }, uniquingKeysWith: { first, _ in first })
-        return records.compactMap { process in
+        // Explicit result type: Swift 6.3 infers this multi-statement closure as non-optional.
+        return records.compactMap { (process: ProcessRecord) -> DiscoveredAgent? in
             guard process.uid == getuid(), let kind = kind(for: process.executable) else { return nil }
             var ancestors: [ProcessRecord] = []
             var next = process.parent
