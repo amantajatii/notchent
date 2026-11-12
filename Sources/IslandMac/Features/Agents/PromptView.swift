@@ -19,7 +19,7 @@ struct PromptView: View {
         Group {
             if let prompt = registry.prompt, registry.submitted.contains(prompt.id), registry.responseError == "deliverySent" {
                 Text(shell.text("deliverySentCompact"))
-                    .font(.system(size: 12, weight: .medium)).foregroundStyle(Color(white: 0.75))
+                    .font(Font.system(size: 12, weight: .medium)).foregroundStyle(IslandDesign.secondary)
                     .lineLimit(1).frame(width: 280)
             } else {
                 form
@@ -31,18 +31,19 @@ struct PromptView: View {
         VStack(alignment: .leading, spacing: 16) {
             if let prompt = registry.prompt {
                 HStack(spacing: 8) {
-                    Label(prompt.sessionID.ownerInstanceID.hasPrefix("codex-") ? "Codex" : "PID \(prompt.sessionID.pid)", systemImage: "terminal")
+                    HStack(spacing: 6) {
+                        IslandGlyph(symbol: "terminal", tint: IslandTint.codex, size: 24)
+                        Text(prompt.sessionID.ownerInstanceID.hasPrefix("codex-") ? "Codex" : "PID \(prompt.sessionID.pid)")
+                    }
                     Spacer()
                     if shell.state.pendingCount > 1 {
                         Text("\(shell.state.pendingCount)").monospacedDigit()
                             .accessibilityLabel("\(shell.text("pending")): \(shell.state.pendingCount)")
                     }
-                    Button { shell.dispatch?(.closePrompt) } label: {
-                        Image(systemName: "xmark").font(.system(size: 10, weight: .semibold))
-                            .frame(width: 28, height: 28)
-                            .background(Color(white: 0.12), in: Circle())
-                    }.accessibilityLabel(shell.text("back")).help(shell.text("back"))
-                }.font(.system(size: 12, weight: .medium)).foregroundStyle(Color(white: 0.7))
+                    Button { shell.dispatch?(.closePrompt) } label: { Image(systemName: "xmark") }
+                        .buttonStyle(IslandIconButtonStyle(emphasis: .plain, tint: IslandDesign.primary))
+                        .accessibilityLabel(shell.text("back")).help(shell.text("back"))
+                }.font(Font.system(size: 12, weight: .medium)).foregroundStyle(IslandDesign.secondary)
                     .help(prompt.sourceLabel ?? "")
 
                 ScrollView {
@@ -55,13 +56,14 @@ struct PromptView: View {
                                     ExpandablePromptText(text: question.text, shell: shell).id(prompt.id)
                                     ForEach(question.choices, id: \.id) { choice in
                                         Button { reply.answers[question.id] = choice.id } label: {
-                                            choiceRow(choice.text, symbol: reply.answers[question.id] == choice.id ? "checkmark.circle.fill" : "circle", selected: reply.answers[question.id] == choice.id)
-                                        }.accessibilityAddTraits(reply.answers[question.id] == choice.id ? .isSelected : [])
+                                            choiceRow(choice.text, symbol: reply.answers[question.id] == choice.id ? "checkmark.circle.fill" : "circle",
+                                                      emphasis: reply.answers[question.id] == choice.id ? .filled : .plain, tint: IslandTint.agents)
+                                        }.buttonStyle(.plain).accessibilityAddTraits(reply.answers[question.id] == choice.id ? .isSelected : [])
                                     }
                                     if question.acceptsText {
                                         TextField(shell.text("reply"), text: Binding(get: { reply.answers[question.id] ?? "" }, set: { reply.answers[question.id] = $0 }))
                                             .textFieldStyle(.plain).padding(12)
-                                            .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 14))
+                                            .background(IslandDesign.card, in: RoundedRectangle(cornerRadius: IslandDesign.rowRadius, style: .continuous))
                                             .accessibilityLabel(shell.text("reply"))
                                     }
                                 }
@@ -76,17 +78,16 @@ struct PromptView: View {
 
                 ForEach(prompt.choices, id: \.id) { choice in
                     Button { _ = registry.respond(.choice(choice.id), to: prompt) } label: {
-                        choiceRow(choiceLabel(choice, prompt: prompt), symbol: choice.id == "accept" ? "checkmark" : "chevron.right", selected: choice.id == "accept")
-                    }.disabled(registry.submitted.contains(prompt.id))
+                        choiceRow(choiceLabel(choice, prompt: prompt), symbol: choiceSymbol(choice.id),
+                                  emphasis: choiceStyle(choice.id).0, tint: choiceStyle(choice.id).1)
+                    }.buttonStyle(.plain).disabled(registry.submitted.contains(prompt.id))
                 }
                 if !prompt.questions.isEmpty {
                     HStack {
                         Spacer()
-                        Button { _ = registry.respond(.answers(reply.answers), to: prompt) } label: {
-                            Text(shell.text("send")).font(.system(size: 12, weight: .semibold))
-                                .padding(.horizontal, 20).padding(.vertical, 10)
-                                .foregroundStyle(.black).background(.white, in: Capsule())
-                        }.disabled(registry.submitted.contains(prompt.id) || !prompt.accepts(answers: reply.answers))
+                        Button(shell.text("send")) { _ = registry.respond(.answers(reply.answers), to: prompt) }
+                            .buttonStyle(IslandPillButtonStyle(emphasis: .filled, tint: IslandTint.agents))
+                            .disabled(registry.submitted.contains(prompt.id) || !prompt.accepts(answers: reply.answers))
                     }
                 }
                 if prompt.acceptsText {
@@ -94,34 +95,56 @@ struct PromptView: View {
                         TextField(shell.text("reply"), text: $reply.text, axis: .vertical)
                             .textFieldStyle(.plain).lineLimit(1...4)
                             .accessibilityLabel(shell.text("reply"))
-                        Button { _ = registry.respond(.text(reply.text), to: prompt) } label: {
-                            Image(systemName: "arrow.up").font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.black).frame(width: 30, height: 30)
-                                .background(.white, in: Circle())
-                        }.accessibilityLabel(shell.text("send"))
+                        Button { _ = registry.respond(.text(reply.text), to: prompt) } label: { Image(systemName: "arrow.up") }
+                            .buttonStyle(IslandIconButtonStyle(emphasis: .filled, tint: IslandTint.agents))
+                            .accessibilityLabel(shell.text("send"))
                             .disabled(registry.submitted.contains(prompt.id) || reply.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }.padding(8).padding(.leading, 6)
-                        .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 18))
+                    }.padding(6).padding(.leading, 8)
+                        .background(IslandDesign.card, in: RoundedRectangle(cornerRadius: IslandDesign.cardRadius, style: .continuous))
                         .disabled(registry.submitted.contains(prompt.id))
                 }
                 if let error = registry.responseError {
-                    Text(shell.text(error)).font(.caption).foregroundStyle(Color(white: 0.75))
+                    Text(shell.text(error)).font(IslandDesign.caption).foregroundStyle(IslandDesign.secondary)
                 }
             } else {
                 Text(shell.text("promptUnavailable"))
-                Button(shell.text("back")) { shell.dispatch?(.closePrompt) }
+                Button(shell.text("back")) { shell.dispatch?(.closePrompt) }.buttonStyle(IslandPillButtonStyle())
             }
         }.frame(width: 440)
     }
 
-    private func choiceRow(_ text: String, symbol: String, selected: Bool) -> some View {
-        HStack(spacing: 12) {
+    private func choiceRow(_ text: String, symbol: String, emphasis: IslandControlEmphasis, tint: Color) -> some View {
+        let shape = RoundedRectangle(cornerRadius: IslandDesign.rowRadius + 2, style: .continuous)
+        let foreground: Color = emphasis == .filled ? .white : (emphasis == .tinted ? tint : IslandDesign.primary)
+        let background: Color = emphasis == .filled ? tint : (emphasis == .tinted ? tint.opacity(IslandDesign.tintBackground) : IslandDesign.card)
+        return HStack(spacing: 12) {
             Text(text).frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
             Image(systemName: symbol).font(.system(size: 13, weight: .medium))
-        }.font(.system(size: 13, weight: .medium)).padding(14)
-            .foregroundStyle(selected ? Color.black : .white)
-            .background(selected ? Color.white : Color(white: 0.1), in: RoundedRectangle(cornerRadius: 16))
+        }.font(Font.system(size: 13, weight: .medium)).padding(IslandDesign.cardPadding)
+            .foregroundStyle(foreground)
+            .background(background, in: shape)
+            .contentShape(shape)
+    }
+
+    /// Accept is green, decline/deny is red, cancel and anything else stays neutral.
+    private func choiceStyle(_ id: String) -> (IslandControlEmphasis, Color) {
+        switch id {
+        // Like an Apple alert: the default action in the accent colour, destructive ones in red.
+        case "accept": return (.filled, IslandDesign.accent)
+        case "decline": return (.destructive, IslandDesign.danger)
+        default:
+            if id.hasPrefix("networkPolicy:deny:") { return (.destructive, IslandDesign.danger) }
+            return (.plain, IslandDesign.primary)
+        }
+    }
+
+    private func choiceSymbol(_ id: String) -> String {
+        switch choiceStyle(id).1 {
+        case IslandDesign.success: return "checkmark"
+        case IslandDesign.danger: return "xmark"
+        default: return "chevron.right"
+        }
     }
 
     private func choiceLabel(_ choice: PromptChoice, prompt: AgentPrompt) -> String {
@@ -159,9 +182,9 @@ struct ExpandablePromptText: View {
                     HStack(spacing: 5) {
                         Text(shell.text(expanded ? "promptCollapse" : "promptExpand"))
                         Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                    }.font(.system(size: 11, weight: .medium)).foregroundStyle(Color(white: 0.7))
+                    }.font(Font.system(size: 11, weight: .medium)).foregroundStyle(IslandDesign.secondary)
                         .padding(.vertical, 4)
-                }
+                }.buttonStyle(.plain)
             }
         }.font(.system(size: 15, weight: .medium))
     }

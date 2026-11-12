@@ -5,36 +5,37 @@ struct UsageSection: View {
     @ObservedObject var shell: IslandShell
 
     var body: some View {
-        HStack(spacing: 12) {
-            UsageCard(title: "Codex", symbol: "chevron.left.forwardslash.chevron.right", setupKey: "usageCodexMissing",
+        HStack(spacing: IslandDesign.gap) {
+            UsageCard(title: "Codex", symbol: "chevron.left.forwardslash.chevron.right", tint: IslandTint.codex, setupKey: "usageCodexMissing",
                       store: shell.codexUsage, shell: shell)
-            UsageCard(title: "Claude", symbol: "sparkle", setupKey: "usageClaudeSetup",
+            UsageCard(title: "Claude", symbol: "sparkle", tint: IslandTint.claude, setupKey: "usageClaudeSetup",
                       store: shell.claudeUsage, shell: shell)
         }
     }
 }
 
 private enum UsageStyle {
-    static let cardRadius: CGFloat = 18
     static let cardHeight: CGFloat = 118
     static let ringSize: CGFloat = 46
     static let ringWidth: CGFloat = 5
-    static let lowRemaining = 25
     static let criticalRemaining = 10
-    static let secondary = Color(white: 0.6)
-    static let card = Color(white: 1, opacity: 0.07)
-    static let track = Color(white: 1, opacity: 0.12)
+    static let secondary = IslandDesign.secondary
+    static let track = IslandDesign.fill
 
-    static func tint(remaining: Int) -> Color {
-        if remaining <= criticalRemaining { return .red }
-        if remaining <= lowRemaining { return .orange }
-        return .green
+    static let lowRemaining = 25
+
+    /// Batteries-widget colours: green while healthy, orange when low, red when nearly gone.
+    static func tint(remaining: Int, service: Color) -> Color {
+        if remaining <= criticalRemaining { return IslandDesign.danger }
+        if remaining <= lowRemaining { return IslandDesign.warning }
+        return IslandDesign.success
     }
 }
 
 struct UsageCard: View {
     let title: String
     let symbol: String
+    let tint: Color
     /// Shown when the data source has not been set up on this Mac.
     let setupKey: String
     @ObservedObject var store: UsageStore
@@ -46,24 +47,20 @@ struct UsageCard: View {
             if let usage = store.snapshot, !usage.windows.isEmpty {
                 HStack(spacing: 0) {
                     ForEach(Array(usage.windows.enumerated()), id: \.offset) { _, window in
-                        UsageRing(window: window, shell: shell).frame(maxWidth: .infinity)
+                        UsageRing(window: window, tint: tint, shell: shell).frame(maxWidth: .infinity)
                     }
                 }
             } else {
                 emptyState
             }
-        }.padding(14)
-            .frame(maxWidth: .infinity, minHeight: UsageStyle.cardHeight, alignment: .topLeading)
-            .background(UsageStyle.card, in: RoundedRectangle(cornerRadius: UsageStyle.cardRadius, style: .continuous))
+        }.frame(maxWidth: .infinity, minHeight: UsageStyle.cardHeight - 2 * IslandDesign.cardPadding, alignment: .topLeading)
+            .islandCard()
             .help(observedHelp)
             .animation(.smooth, value: store.snapshot)
     }
 
     private var header: some View {
-        HStack(spacing: 6) {
-            Image(systemName: symbol).font(.system(size: 11, weight: .semibold)).foregroundStyle(UsageStyle.secondary)
-            Text(title).font(.system(size: 13, weight: .semibold))
-            Spacer(minLength: 4)
+        IslandCardHeader(title, symbol: symbol, tint: tint) {
             Text(shell.text("usageRemaining")).font(.system(size: 10, weight: .medium)).foregroundStyle(UsageStyle.secondary)
             Button { Task { await store.refresh() } } label: {
                 Image(systemName: "arrow.clockwise").font(.system(size: 10, weight: .semibold))
@@ -97,6 +94,7 @@ struct UsageCard: View {
 /// A capacity ring in the style of the system Batteries widget.
 private struct UsageRing: View {
     let window: UsageWindow
+    let tint: Color
     @ObservedObject var shell: IslandShell
 
     var body: some View {
@@ -105,12 +103,13 @@ private struct UsageRing: View {
             let remaining = expired ? 0 : window.remainingPercent
             VStack(spacing: 6) {
                 ZStack {
-                    Circle().stroke(UsageStyle.track, lineWidth: UsageStyle.ringWidth)
+                    Circle().stroke(IslandDesign.fill, lineWidth: UsageStyle.ringWidth)
                     Circle().trim(from: 0, to: CGFloat(remaining) / 100)
-                        .stroke(UsageStyle.tint(remaining: remaining), style: StrokeStyle(lineWidth: UsageStyle.ringWidth, lineCap: .round))
+                        .stroke(UsageStyle.tint(remaining: remaining, service: tint), style: StrokeStyle(lineWidth: UsageStyle.ringWidth, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                     Text(expired ? "–" : "\(remaining)%")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .font(.system(size: 13, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .foregroundStyle(expired ? IslandDesign.secondary : UsageStyle.tint(remaining: remaining, service: tint))
                         .minimumScaleFactor(0.7)
                 }.frame(width: UsageStyle.ringSize, height: UsageStyle.ringSize)
                 VStack(spacing: 1) {

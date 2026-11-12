@@ -17,12 +17,10 @@ struct AgentListView: View {
     @StateObject private var detailState = AgentDetailState()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: IslandDesign.gap) {
             if registry.agents.isEmpty {
-                Label(shell.text("noAgentSessions"), systemImage: "square.3.layers.3d")
-                    .font(.system(size: 13, weight: .medium))
-                Text(shell.text(registry.codexConnected ? "codexMonitoring" : "agentIntegrationPending"))
-                    .font(.caption).foregroundStyle(.secondary)
+                IslandEmptyState(title: shell.text("noAgentSessions"), symbol: "square.3.layers.3d",
+                                 message: shell.text(registry.codexConnected ? "codexMonitoring" : "agentIntegrationPending"))
             } else {
                 ScrollView {
                     VStack(spacing: 8) {
@@ -39,7 +37,7 @@ struct AgentListView: View {
                 }
             }
         }
-        .frame(width: 520, alignment: .leading)
+        .frame(width: IslandDesign.contentWidth, alignment: .leading)
         .onChange(of: registry.agents.map(\.id)) { _, ids in
             if let id = detailState.replyAgentID, !ids.contains(id) { detailState.replyAgentID = nil }
             if let id = registry.selectedAgentID, !ids.contains(id) { registry.selectedAgentID = nil }
@@ -59,89 +57,121 @@ struct AgentListView: View {
     private func host(_ agent: DiscoveredAgent) -> String {
         agent.ownedTerminal != nil ? "IslandMac" : (agent.host == .codexDesktop ? "Codex" : (agent.host?.rawValue ?? shell.text("hostUnknown")))
     }
+
     private func detail(_ agent: DiscoveredAgent) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Circle().fill(Color(red: 0.62, green: 0.70, blue: 1)).frame(width: 6, height: 6)
-                Text(title(agent)).font(.system(size: 14, weight: .semibold)).lineLimit(2)
-                Spacer(minLength: 8)
-                if let activity = agent.activity {
-                    Text(shell.text(activity)).font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary).padding(.horizontal, 7).padding(.vertical, 3)
-                        .background(.white.opacity(0.08), in: Capsule())
-                }
-            }
-            HStack(spacing: 6) {
-                Label(agent.kind == .codex ? "Codex" : agent.kind.rawValue, systemImage: "terminal.fill")
-                    .foregroundStyle(Color(red: 0.65, green: 0.72, blue: 1))
-                Text("· " + host(agent)).foregroundStyle(.secondary)
-                Spacer()
-            }.font(.system(size: 11, weight: .medium))
-            if let project = project(agent) {
-                Text(URL(fileURLWithPath: project).lastPathComponent)
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
-                    .help(project).textSelection(.enabled)
-            }
-            if detailState.replyAgentID != agent.id, let summary = agent.summary, !summary.isEmpty {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: agent.activity == "sessionCompleted" ? "checkmark" : "text.bubble")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color(red: 0.65, green: 0.72, blue: 1))
-                        .frame(width: 28, height: 28)
-                        .background(.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 8))
-                    VStack(alignment: .leading, spacing: 4) {
-                        if let activity = agent.activity {
-                            Text(shell.text(activity)).font(.system(size: 11)).foregroundStyle(.secondary)
-                        }
-                        Text(summary).font(.system(size: 12, weight: .medium))
-                            .lineLimit(2).textSelection(.enabled)
-                    }
-                }
-            }
-            if detailState.replyAgentID == agent.id, let session = agent.sessionID, agent.kind == .codex {
-                HStack {
-                    Label("Chat", systemImage: "bubble.left.and.bubble.right").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
-                    Spacer()
-                    Button { detailState.replyAgentID = nil } label: { Image(systemName: "xmark").frame(width: 24, height: 24) }
-                        .accessibilityLabel(shell.text("back"))
-                }
-                AgentConversationView(draft: registry.chatDraft(for: session), registry: registry, shell: shell,
-                                      session: session, activity: agent.activity, summary: agent.summary)
-                    .id(session)
-            }
-            if detailState.replyAgentID != agent.id {
-            HStack(spacing: 8) {
-                if let project = project(agent) {
-                    Label(URL(fileURLWithPath: project).lastPathComponent, systemImage: "folder")
-                        .font(.system(size: 11, weight: .medium)).lineLimit(1)
-                        .foregroundStyle(.secondary).padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(.white.opacity(0.07), in: Capsule())
-                }
-                Spacer(minLength: 0)
-                if let prompt = registry.prompt, prompt.sessionID == agent.sessionID {
-                    Button(shell.text("openPrompt")) { shell.dispatch?(.openPrompt) }
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                }
-                if let terminal = agent.ownedTerminal {
-                    Button(shell.text("openTerminal")) {
-                        guard shell.terminals.sessionIDs.contains(terminal), shell.terminals.isRunning(terminal) else { return }
-                        shell.terminals.selectedID = terminal
-                        shell.dispatch?(.show(.terminal))
-                    }.padding(.horizontal, 10).padding(.vertical, 6)
-                }
-                if agent.sessionID != nil && agent.kind == .codex {
-                    Button(shell.text("reply")) { detailState.replyAgentID = agent.id }
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.black).padding(.horizontal, 15).padding(.vertical, 7)
-                        .background(.white, in: Capsule())
-                }
-            }
+        let isReplying = detailState.replyAgentID == agent.id
+        return VStack(alignment: .leading, spacing: 10) {
+            header(agent)
+            metadata(agent)
+            if !isReplying, let summary = agent.summary, !summary.isEmpty { summaryRow(agent, summary: summary) }
+            if isReplying, let session = agent.sessionID, agent.kind == .codex { chat(agent, session: session) }
+            if !isReplying { actions(agent) }
+        }
+        .islandCard()
+        .background(selectedBackground(agent), in: RoundedRectangle(cornerRadius: IslandDesign.cardRadius, style: .continuous))
+        .overlay {
+            if registry.selectedAgentID == agent.id {
+                RoundedRectangle(cornerRadius: IslandDesign.cardRadius, style: .continuous)
+                    .strokeBorder(IslandTint.agents.opacity(0.7), lineWidth: 1.5)
             }
         }
-        .padding(14)
-        .background(Color(white: 0.10), in: RoundedRectangle(cornerRadius: 16))
     }
 
+    private func selectedBackground(_ agent: DiscoveredAgent) -> Color {
+        registry.selectedAgentID == agent.id ? IslandTint.agents.opacity(0.18) : .clear
+    }
+    private func tint(_ agent: DiscoveredAgent) -> Color {
+        switch agent.kind {
+        case .codex: IslandTint.codex
+        case .claudeCode: IslandTint.claude
+        case .antigravity, .ohMyPi: IslandTint.agents
+        }
+    }
+    private func statusColor(_ agent: DiscoveredAgent) -> Color {
+        if agent.activity == "sessionCompleted" { return IslandDesign.success }
+        if let prompt = registry.prompt, prompt.sessionID == agent.sessionID { return IslandDesign.warning }
+        return IslandTint.agents
+    }
+
+    private func header(_ agent: DiscoveredAgent) -> some View {
+        HStack(spacing: 8) {
+            IslandGlyph(symbol: agent.kind == .codex ? "sparkles" : "terminal.fill", tint: tint(agent), size: 26)
+            Circle().fill(statusColor(agent)).frame(width: 7, height: 7)
+            Text(title(agent)).font(IslandDesign.title).lineLimit(2)
+            Spacer(minLength: 8)
+            if let activity = agent.activity {
+                Text(shell.text(activity)).font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(IslandDesign.secondary).padding(.horizontal, 8).padding(.vertical, 3)
+                    .background(IslandDesign.fill, in: Capsule())
+            }
+        }
+    }
+
+    private func metadata(_ agent: DiscoveredAgent) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 4) {
+                Image(systemName: "terminal.fill").foregroundStyle(tint(agent))
+                Text((agent.kind == .codex ? "Codex" : agent.kind.rawValue) + " · " + host(agent))
+            }
+            if let project = project(agent) {
+                Text(URL(fileURLWithPath: project).lastPathComponent)
+                    .help(project).textSelection(.enabled)
+            }
+        }.font(IslandDesign.caption).foregroundStyle(IslandDesign.secondary)
+    }
+
+    private func summaryRow(_ agent: DiscoveredAgent, summary: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            IslandGlyph(symbol: agent.activity == "sessionCompleted" ? "checkmark" : "text.bubble",
+                        tint: agent.activity == "sessionCompleted" ? IslandDesign.success : tint(agent))
+            VStack(alignment: .leading, spacing: 3) {
+                if let activity = agent.activity {
+                    Text(shell.text(activity)).font(IslandDesign.caption).foregroundStyle(IslandDesign.secondary)
+                }
+                Text(summary).font(IslandDesign.callout).lineLimit(2).textSelection(.enabled)
+            }
+        }
+    }
+
+    private func chat(_ agent: DiscoveredAgent, session: SessionID) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            IslandCardHeader("Chat", symbol: "bubble.left.and.bubble.right", tint: tint(agent)) {
+                Button { detailState.replyAgentID = nil } label: { Image(systemName: "xmark") }
+                    .buttonStyle(IslandIconButtonStyle(emphasis: .plain, tint: IslandDesign.primary))
+                    .accessibilityLabel(shell.text("back"))
+            }
+            AgentConversationView(draft: registry.chatDraft(for: session), registry: registry, shell: shell,
+                                  session: session, activity: agent.activity, summary: agent.summary)
+                .id(session)
+        }
+    }
+
+    private func actions(_ agent: DiscoveredAgent) -> some View {
+        HStack(spacing: 8) {
+            if let project = project(agent) {
+                Label(URL(fileURLWithPath: project).lastPathComponent, systemImage: "folder")
+                    .font(.system(size: 11, weight: .medium)).lineLimit(1)
+                    .foregroundStyle(IslandDesign.secondary).padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(IslandDesign.fill, in: Capsule())
+            }
+            Spacer(minLength: 0)
+            if let prompt = registry.prompt, prompt.sessionID == agent.sessionID {
+                Button(shell.text("openPrompt")) { shell.dispatch?(.openPrompt) }
+                    .buttonStyle(IslandPillButtonStyle())
+            }
+            if let terminal = agent.ownedTerminal {
+                Button(shell.text("openTerminal")) {
+                    guard shell.terminals.sessionIDs.contains(terminal), shell.terminals.isRunning(terminal) else { return }
+                    shell.terminals.selectedID = terminal
+                    shell.dispatch?(.show(.terminal))
+                }.buttonStyle(IslandPillButtonStyle())
+            }
+            if agent.sessionID != nil && agent.kind == .codex {
+                Button(shell.text("reply")) { detailState.replyAgentID = agent.id }
+                    .buttonStyle(IslandPillButtonStyle(emphasis: .filled, tint: tint(agent)))
+            }
+        }
+    }
 }
 
 private struct AgentConversationView: View {
@@ -158,29 +188,15 @@ private struct AgentConversationView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
                         if draft.historyLoading && draft.history.isEmpty { ProgressView().controlSize(.small) }
-                        if draft.historyError { Text(shell.text("chatUnavailable")).foregroundStyle(.secondary).font(.caption) }
-                        ForEach(draft.history) { message in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(message.role == "userMessage" ? "You" : "Codex").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
-                                if !message.text.isEmpty {
-                                    Text(message.text).font(.system(size: 12)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                                ForEach(Array(message.images.enumerated()), id: \.offset) { _, image in
-                                    ChatImagePreview(source: image)
-                                }
-                                if let status = message.deliveryStatus {
-                                    Text(shell.text(status)).font(.system(size: 10)).foregroundStyle(.secondary)
-                                }
-                            }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
-                                .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
-                        }
+                        if draft.historyError { Text(shell.text("chatUnavailable")).foregroundStyle(IslandDesign.secondary).font(IslandDesign.caption) }
+                        ForEach(draft.history) { message in bubble(message) }
                         Color.clear.frame(height: 1).id("chat-bottom")
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }.frame(height: 180)
                 .onChange(of: draft.history.map(\.id)) { _, _ in proxy.scrollTo("chat-bottom", anchor: .bottom) }
             }
             if session.ownerInstanceID == "codex-observed" {
-                Text(shell.text("desktopReplyUnavailable")).font(.caption).foregroundStyle(.secondary)
+                Text(shell.text("desktopReplyUnavailable")).font(IslandDesign.caption).foregroundStyle(IslandDesign.secondary)
             }
             AgentChatComposer(draft: draft, registry: registry, shell: shell, session: session)
         }
@@ -196,6 +212,28 @@ private struct AgentConversationView: View {
             }
         }
     }
+    private func bubble(_ message: AgentChatEntry) -> some View {
+        let isUser = message.role == "userMessage"
+        return VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
+                if !message.text.isEmpty {
+                    Text(message.text).font(IslandDesign.callout).textSelection(.enabled)
+                }
+                ForEach(Array(message.images.enumerated()), id: \.offset) { _, image in
+                    ChatImagePreview(source: image)
+                }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .foregroundStyle(IslandDesign.primary)
+            .background(isUser ? IslandTint.agents : IslandDesign.fill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            Text(isUser ? "You" : "Codex").font(IslandDesign.footnote).foregroundStyle(IslandDesign.tertiary)
+            if let status = message.deliveryStatus {
+                Text(shell.text(status)).font(IslandDesign.footnote).foregroundStyle(IslandDesign.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+        .padding(isUser ? .leading : .trailing, 56)
+    }
 }
 
 private struct ChatImagePreview: View {
@@ -204,7 +242,7 @@ private struct ChatImagePreview: View {
         if source.hasPrefix("data:image/"), let comma = source.firstIndex(of: ","),
            let data = Data(base64Encoded: String(source[source.index(after: comma)...])), let image = NSImage(data: data) {
             Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: 160, maxHeight: 90)
-                .clipShape(RoundedRectangle(cornerRadius: 6)).accessibilityLabel("Attached image")
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous)).accessibilityLabel("Attached image")
         } else {
             Label("Image", systemImage: "photo").font(.caption).foregroundStyle(.secondary)
         }
@@ -234,32 +272,27 @@ private struct AgentChatComposer: View {
                     }.padding(2)
                 }
             }
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 ZStack(alignment: .topLeading) {
                     if draft.text.isEmpty {
-                        Text(shell.text("chatPlaceholder")).font(.system(size: 13)).foregroundStyle(.secondary)
+                        Text(shell.text("chatPlaceholder")).font(IslandDesign.body).foregroundStyle(IslandDesign.secondary)
                             .allowsHitTesting(false)
                     }
                     AgentChatInput(draft: draft, placeholder: shell.text("chatPlaceholder"), send: send)
-                }.frame(height: 36)
-                Button { send() } label: {
-                    Image(systemName: "arrow.up").font(.system(size: 12, weight: .semibold))
-                        .frame(width: 30, height: 30)
-                        .foregroundStyle(canSend ? Color.black : Color.white.opacity(0.5))
-                        .background(canSend ? Color.white : Color.white.opacity(0.12), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(shell.text("send"))
-                .disabled(!canSend)
+                }.frame(height: 32)
+                Button { send() } label: { Image(systemName: "arrow.up") }
+                    .buttonStyle(IslandIconButtonStyle(emphasis: canSend ? .filled : .plain, tint: IslandTint.agents))
+                    .accessibilityLabel(shell.text("send"))
+                    .disabled(!canSend)
             }
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+            .padding(.leading, 14).padding(.trailing, 6).padding(.vertical, 5)
+            .background(IslandDesign.fill, in: RoundedRectangle(cornerRadius: IslandDesign.rowRadius + 4, style: .continuous))
             if let status = draft.status {
-                Text(shell.text(status)).font(.caption).foregroundStyle(.secondary)
+                Text(shell.text(status)).font(IslandDesign.caption).foregroundStyle(IslandDesign.secondary)
             }
             if draft.uncertain {
                 Button(shell.text("chatUnlock")) { draft.uncertain = false; draft.status = nil }
-                    .font(.caption).padding(.vertical, 4)
+                    .buttonStyle(IslandPillButtonStyle())
             }
         }
         .onDisappear { shell.dispatch?(.inputChanged(false)) }

@@ -291,40 +291,61 @@ struct IslandRootView: View {
         if case let .feature(feature) = shell.presentedMode { return feature }
         return .home
     }
+    private static let tabs: [IslandFeature] = [.home, .agents, .music, .files, .terminal]
+    private static let tabWidth: CGFloat = 74
+    private static let tabHeight: CGFloat = 28
+    private static let tabSpacing: CGFloat = 2
+    /// A segmented control, like the ones in Control Center and System Settings.
     private var navigation: some View {
-        ZStack {
-            HStack(spacing: 4) {
-                ForEach([IslandFeature.home, .agents, .music, .files, .terminal], id: \.self) { feature in
-                    Button { shell.dispatch?(.show(feature)) } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: symbol(for: feature)).font(.system(size: 12, weight: .medium))
-                            Text(shell.text(feature.rawValue)).font(.system(size: 11, weight: selectedFeature == feature ? .semibold : .medium))
-                        }
-                        .foregroundStyle(selectedFeature == feature ? .white : Color(white: 0.62))
-                        .frame(width: 74, height: 32)
-                        .contentShape(Rectangle())
-                    }.help(shell.text(feature.rawValue)).accessibilityLabel(shell.text(feature.rawValue))
-                }
+        HStack(spacing: 0) {
+            navigationButton(symbol: "gearshape.fill", key: "settings", selected: selectedFeature == .settings) {
+                shell.dispatch?(.show(.settings))
             }
-            .background {
-                let features: [IslandFeature] = [.home, .agents, .music, .files, .terminal]
-                let index = features.firstIndex(of: selectedFeature)
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.white.opacity(0.1))
-                    .frame(width: 74, height: 32)
-                    .offset(x: CGFloat((index ?? 2) - 2) * 78)
-                    .opacity(index == nil ? 0 : 1)
-                    .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .timingCurve(0.22, 1, 0.36, 1, duration: 0.42), value: index)
-                    .allowsHitTesting(false)
+            Spacer(minLength: 8)
+            tabStrip
+            Spacer(minLength: 8)
+            navigationButton(symbol: "chevron.up", key: "hide", selected: false) {
+                shell.dispatch?(.inputChanged(false))
+                shell.dispatch?(.hide)
             }
-            HStack(spacing: 4) {
-                Button {
-                    shell.dispatch?(.inputChanged(false))
-                    shell.dispatch?(.hide)
-                } label: { Image(systemName: "minus").frame(width: 30, height: 30).foregroundStyle(Color(white: 0.62)) }
-                    .help(shell.text("hide")).accessibilityLabel(shell.text("hide"))
-            }.frame(maxWidth: .infinity, alignment: .trailing)
-        }.frame(width: 520, height: 32)
+        }.frame(width: IslandDesign.contentWidth)
+    }
+    private var tabStrip: some View {
+        HStack(spacing: Self.tabSpacing) {
+            ForEach(Self.tabs, id: \.self) { feature in
+                let selected = selectedFeature == feature
+                Button { shell.dispatch?(.show(feature)) } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: symbol(for: feature)).font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(selected ? IslandDesign.primary : IslandDesign.secondary)
+                        Text(shell.text(feature.rawValue)).font(.system(size: 11, weight: selected ? .semibold : .medium)).lineLimit(1)
+                            .foregroundStyle(selected ? IslandDesign.primary : IslandDesign.secondary)
+                    }
+                    .frame(width: Self.tabWidth, height: Self.tabHeight)
+                    .contentShape(Capsule())
+                }.buttonStyle(.plain)
+                    .help(shell.text(feature.rawValue)).accessibilityLabel(shell.text(feature.rawValue))
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .background {
+            let index = Self.tabs.firstIndex(of: selectedFeature)
+            let center = CGFloat(Self.tabs.count - 1) / 2
+            Capsule().fill(IslandDesign.fillStrong)
+                .frame(width: Self.tabWidth, height: Self.tabHeight)
+                .offset(x: (CGFloat(index ?? 0) - center) * (Self.tabWidth + Self.tabSpacing))
+                .opacity(index == nil ? 0 : 1)
+                .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .timingCurve(0.22, 1, 0.36, 1, duration: 0.42), value: index)
+                .allowsHitTesting(false)
+        }
+        .padding(3)
+        .background(Capsule().fill(IslandDesign.card))
+        .animation(.easeOut(duration: 0.2), value: selectedFeature)
+    }
+    private func navigationButton(symbol: String, key: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: symbol) }
+            .buttonStyle(IslandIconButtonStyle(emphasis: selected ? .filled : .plain, tint: .white))
+            .help(shell.text(key)).accessibilityLabel(shell.text(key))
     }
     private func symbol(for feature: IslandFeature) -> String {
         switch feature {
@@ -344,8 +365,8 @@ struct IslandRootView: View {
         else if feature == .home { HomeView(shell: shell, spotify: shell.spotify) }
         else if feature == .music { MusicView(shell: shell, spotify: shell.spotify) }
         else {
-            Text(shell.text(feature == .music ? "musicUnavailable" : feature == .agents ? "agentsUnavailable" : feature == .files ? "filesUnavailable" : "terminalUnavailable"))
-                .font(.callout).foregroundStyle(.secondary).padding(.vertical, 12).frame(width: 520)
+            IslandEmptyState(title: shell.text(feature == .agents ? "agentsUnavailable" : feature == .files ? "filesUnavailable" : "terminalUnavailable"),
+                             symbol: symbol(for: feature))
         }
     }
 }

@@ -8,42 +8,48 @@ struct FileShelfView: View {
     @ObservedObject var shell: IslandShell
     @ObservedObject var access: NativeFileAccess
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             if access.items.isEmpty {
-                HStack(spacing: 14) {
-                    Image(systemName: "tray").font(.system(size: 26, weight: .light)).foregroundStyle(.secondary)
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(shell.text("shelfEmpty")).font(.system(size: 15, weight: .medium))
-                        Text(shell.text("drop")).font(.caption).foregroundStyle(.secondary)
-                    }
-                }.frame(width: 520, height: 76, alignment: .leading)
-            }
-            else {
-                ScrollView(.horizontal) {
+                IslandEmptyState(title: shell.text("shelfEmpty"), symbol: "tray", message: shell.text("drop"))
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
-                        ForEach(access.items) { item in
-                            VStack(alignment: .leading, spacing: 5) {
-                                FileThumbnail(item: item, access: access)
-                                    .frame(width: 64, height: 58)
-                                    .overlay(FileDragSource(item: item, access: access, dragEnded: { shell.dispatch?(.shelfDragEnded) }) { access.selected = item.id })
-                                Text(item.displayName).font(.caption2).lineLimit(1).truncationMode(.middle)
-                                    .help(item.displayName)
-                                if !item.isAvailable { Text(shell.text("shelfUnavailable")).font(.caption2).foregroundStyle(.orange) }
-                                if access.selected == item.id {
-                                    Button(shell.text("shelfRemove")) { access.remove(item.id); access.selected = nil }
-                                        .font(.caption2)
-                                }
-                            }
-                            .frame(width: 96, alignment: .leading)
-                            .padding(7)
-                            .background(access.selected == item.id ? Color.white.opacity(0.16) : Color.white.opacity(0.06))
-                            .clipShape(RoundedRectangle(cornerRadius: 9))
-                        }
+                        ForEach(access.items) { item in FileTile(shell: shell, access: access, item: item) }
                     }
-                }.frame(width: 520)
+                }.frame(width: IslandDesign.contentWidth)
             }
-            if let error = access.error { Text(error).font(.caption2).foregroundStyle(.red) }
-        }.frame(width: 520, alignment: .leading)
+            if let error = access.error { Text(error).font(IslandDesign.caption).foregroundStyle(IslandDesign.danger) }
+        }.frame(width: IslandDesign.contentWidth, alignment: .leading)
+    }
+}
+
+private struct FileTile: View {
+    @ObservedObject var shell: IslandShell
+    @ObservedObject var access: NativeFileAccess
+    let item: ShelfItem
+    private var isSelected: Bool { access.selected == item.id }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            FileThumbnail(item: item, access: access)
+                .frame(width: 64, height: 58)
+                .overlay(FileDragSource(item: item, access: access, dragEnded: { shell.dispatch?(.shelfDragEnded) }) { access.selected = item.id })
+            Text(item.displayName).font(IslandDesign.caption).lineLimit(1).truncationMode(.middle)
+                .help(item.displayName)
+            if !item.isAvailable {
+                Text(shell.text("shelfUnavailable")).font(IslandDesign.footnote).foregroundStyle(.orange)
+            }
+            if isSelected {
+                Button(shell.text("shelfRemove")) { access.remove(item.id); access.selected = nil }
+                    .buttonStyle(IslandPillButtonStyle(emphasis: .tinted, tint: IslandDesign.danger)).controlSize(.small)
+            }
+        }
+        .frame(width: 96)
+        .padding(8)
+        .background(isSelected ? IslandTint.files.opacity(0.18) : IslandDesign.card,
+                    in: RoundedRectangle(cornerRadius: IslandDesign.rowRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: IslandDesign.rowRadius, style: .continuous)
+            .strokeBorder(isSelected ? IslandTint.files : Color.clear, lineWidth: 1.5))
     }
 }
 
@@ -51,12 +57,15 @@ struct FileShelfSummary: View {
     @ObservedObject var shell: IslandShell
     @ObservedObject var access: NativeFileAccess
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Label(shell.text("files"), systemImage: "square.stack")
-            Text("\(access.items.count) \(shell.text("shelfItems"))")
-                .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-            if let error = access.error {
-                Text(error).font(.caption2).foregroundStyle(.red).lineLimit(2).help(error)
+        HStack(spacing: 10) {
+            IslandGlyph(symbol: "tray.fill", tint: IslandTint.neutral, size: 30)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(shell.text("files")).font(IslandDesign.title).foregroundStyle(IslandDesign.primary)
+                Text("\(access.items.count) \(shell.text("shelfItems"))")
+                    .font(IslandDesign.caption).foregroundStyle(IslandDesign.secondary).lineLimit(1)
+                if let error = access.error {
+                    Text(error).font(IslandDesign.caption).foregroundStyle(IslandDesign.danger).lineLimit(2).help(error)
+                }
             }
         }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
     }
