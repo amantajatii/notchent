@@ -29,6 +29,7 @@ import IslandCore
     let files = NativeFileAccess()
     let terminals = TerminalSessionStore()
     let agents = AgentRegistry()
+    let codexUsage = CodexUsageStore()
     let launchAtLogin = LaunchAtLoginStore()
     init(store: SettingsStore = SettingsStore(), localizations: Bundle = .main) {
         self.store = store
@@ -64,6 +65,7 @@ import IslandCore
         shell.featureViews[.agents] = AnyView(AgentListView(registry: shell.agents, shell: shell))
         shell.agents.completionChanged = { [weak shell] in shell?.dispatch?(.agentCompleted) }
         shell.agents.start(terminals: shell.terminals) { [weak shell] count in shell?.dispatch?(.pendingChanged(count)) }
+        shell.codexUsage.start()
         shell.fileSummaryView = AnyView(FileShelfSummary(shell: shell, access: shell.files))
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "capsule.fill", accessibilityDescription: "Notchent")
@@ -109,5 +111,5 @@ import IslandCore
         for id in shell.terminals.sessionIDs { shell.terminals.close(id) }
         return .terminateNow
     }
-    func applicationWillTerminate(_ notification: Notification) { shell.agents.stop(); controller.stop() }
+    func applicationWillTerminate(_ notification: Notification) { shell.codexUsage.stop(); shell.agents.stop(); controller.stop() }
 }

@@ -5,6 +5,13 @@ struct HomeView: View {
     @ObservedObject var shell: IslandShell
     @ObservedObject var spotify: SpotifyStore
     var body: some View {
+        VStack(spacing: 16) {
+            overview
+            Rectangle().fill(.white.opacity(0.1)).frame(height: 1)
+            CodexUsageView(store: shell.codexUsage, shell: shell)
+        }.frame(width: 520)
+    }
+    private var overview: some View {
         HStack(alignment: .center, spacing: 20) {
             VStack(alignment: .leading, spacing: 14) {
                 Button { shell.dispatch?(.show(.music)) } label: {
