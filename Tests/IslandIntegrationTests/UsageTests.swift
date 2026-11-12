@@ -183,3 +183,15 @@ private actor UsageFixtureClient: UsageClient {
         }
     }
 }
+
+struct UsageDurationTests {
+    @Test func showsTheTwoLargestUnits() {
+        #expect(UsageDuration.compact(2 * 86_400 + 17 * 3600 + 120) == "2d 17h")
+        #expect(UsageDuration.compact(3 * 86_400) == "3d")
+        #expect(UsageDuration.compact(3600 + 38 * 60 + 30) == "1h 38m")
+        #expect(UsageDuration.compact(2 * 3600) == "2h")
+        #expect(UsageDuration.compact(12 * 60) == "12m")
+        #expect(UsageDuration.compact(20) == "<1m")
+        #expect(UsageDuration.compact(-5) == "<1m")
+    }
+}

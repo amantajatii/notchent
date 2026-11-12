@@ -5,9 +5,8 @@ struct HomeView: View {
     @ObservedObject var shell: IslandShell
     @ObservedObject var spotify: SpotifyStore
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 14) {
             overview
-            Rectangle().fill(.white.opacity(0.1)).frame(height: 1)
             UsageSection(shell: shell)
         }.frame(width: 520)
     }
