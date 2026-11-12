@@ -83,7 +83,7 @@ struct HostSessionDiscovery {
         let byPID = Dictionary(records.map { ($0.pid, $0) }, uniquingKeysWith: { first, _ in first })
         // Explicit result type: Swift 6.3 infers this multi-statement closure as non-optional.
         return records.compactMap { (process: ProcessRecord) -> DiscoveredAgent? in
-            guard process.uid == getuid(), let kind = kind(for: process.executable) else { return nil }
+            guard process.uid == getuid(), let kind = Self.kind(for: process.executable) else { return nil }
             var ancestors: [ProcessRecord] = []
             var next = process.parent
             var seen: Set<Int32> = [process.pid]
@@ -91,7 +91,7 @@ struct HostSessionDiscovery {
                 ancestors.append(parent); next = parent.parent
             }
             let terminal = owned.first { id in ancestors.contains { $0.pid == id.pid && $0.birth == id.processStartTime } }
-            let host = ancestors.compactMap { host(for: $0.executable) }.first
+            let host = ancestors.compactMap { Self.host(for: $0.executable) }.first
             let identity = terminal.map { SessionID(ownerInstanceID: $0.ownerInstanceID, pid: process.pid, processStartTime: process.birth, terminalSessionKey: $0.terminalSessionKey) }
             // A TTY and app ancestor identify a host candidate, not its pane's stable identity.
             let evidence = terminal != nil ? "ownedMetadata" : (host != nil ? (process.tty != UInt32.max ? "externalPaneUnknown" : "externalHostOnly") : "hostUnknown")

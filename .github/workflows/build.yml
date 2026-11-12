@@ -1,0 +1,31 @@
+name: Build
+
+# Compiles the release app on every branch push and pull request, on the same runner and
+# toolchain as the Release workflow, so compiler differences surface before a tag is pushed.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Toolchain
+        run: |
+          xcode-select -p
+          swift --version
+
+      - name: Build release app
+        run: scripts/build-app.sh --release
