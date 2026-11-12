@@ -69,6 +69,20 @@ python3 scripts/install-codex-hook.py --helper .build/apps/Notchent.app/Contents
 
 After installation, review and trust the IslandMac definitions through `/hooks` in Codex CLI. The installer does not modify trust records or security mode. Permission prompts offer allow once, deny, or continue in Codex. Desktop preferences are previewed and handed off to the original UI; PreToolUse cannot return tool answers. Cloud-orchestrated Work does not support all of these local hooks.
 
+### Plan usage on Home
+
+Home shows the remaining Codex and Claude plan limits for each window (for example 5h and 7d), with reset times. Numbers refresh shortly after a window resets and at least every 5 minutes for Codex and every 30 seconds for Claude. A failed read shows "unavailable" rather than old numbers.
+
+**Codex** limits come from `account/rateLimits/read`. Notchent asks the shared Codex daemon when its control socket is present and private to you; otherwise it briefly starts its own `codex app-server`. Both paths only read account limits and never open or join a thread. The `codex` executable is searched in `~/.local/bin`, `~/.npm-global/bin`, `~/.bun/bin`, `~/.volta/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, and `PATH`.
+
+**Claude** limits use the `rate_limits` field that Claude Code documents for status line commands. It is only available to Pro and Max subscribers, after the first response in a session. Install the relay once:
+
+```sh
+python3 scripts/install-claude-statusline.py --helper .build/apps/Notchent.app/Contents/MacOS/IslandHook
+```
+
+This sets `statusLine` in `~/.claude/settings.json` (with a backup) to `IslandHook claude-statusline`. The status line shows the model and used percentages. The helper saves only `rate_limits` to `~/Library/Application Support/IslandMac/Usage/claude-rate-limits.json` (owner-only), never prompts, paths, or transcripts. An existing, different status line is never replaced unless you pass `--replace`. Claude limits are as fresh as the last Claude Code response; hover over the row to see when they were reported.
+
 ### File drag activation
 
 The drop area opens when a file drag starts anywhere on screen, without requiring a hover at the top edge. It stays open during the drag and closes after the file is released or the drag is canceled. Stale file data on the drag pasteboard and text drags do not open the panel.

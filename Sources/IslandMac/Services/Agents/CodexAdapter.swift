@@ -228,11 +228,7 @@ actor CodexAdapter: AgentAdapter {
         if let daemon, daemon.pid != owner.pid || daemon.birth != owner.birth { await disconnect() }
         do {
             if socket == nil {
-                let path = home.appendingPathComponent("app-server-control/app-server-control.sock").resolvingSymlinksInPath()
-                let attributes = try FileManager.default.attributesOfItem(atPath: path.path)
-                guard attributes[.type] as? FileAttributeType == .typeSocket,
-                      (attributes[.ownerAccountID] as? NSNumber)?.uint32Value == getuid(),
-                      let permissions = attributes[.posixPermissions] as? NSNumber, permissions.intValue & 0o077 == 0 else { return }
+                guard let path = CodexControlSocket.trustedPath(codexHome: home) else { return }
                 let client = CodexSocket(); socket = client; daemon = owner
                 let token = connectionID
                 try await client.connect(path: path)

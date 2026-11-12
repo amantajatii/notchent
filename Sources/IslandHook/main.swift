@@ -49,6 +49,27 @@ func run() throws -> Data {
     }
     return Data("{}".utf8)
 }
-let output = (try? run()) ?? Data("{}".utf8)
+func readInput() -> Data {
+    var input = Data()
+    while input.count <= ClaudeUsageRecord.maximumInputBytes {
+        guard let chunk = try? FileHandle.standardInput.read(upToCount: 8192), !chunk.isEmpty else { break }
+        input.append(chunk)
+    }
+    return input
+}
+
+/// Claude Code status line: relay `rate_limits` to Notchent and print a short status.
+/// A failed relay never breaks the status line itself.
+func runClaudeStatusLine() -> Data {
+    let input = readInput()
+    let relay = ClaudeUsageRelay()
+    let fresh = ClaudeUsageRecord.extract(statusLineInput: input)
+    if let fresh { try? relay.write(fresh) }
+    return Data(ClaudeStatusLine.text(statusLineInput: input, record: fresh ?? relay.read()?.current(at: Date())).utf8)
+}
+
+let output = CommandLine.arguments.dropFirst().first == "claude-statusline"
+    ? runClaudeStatusLine()
+    : (try? run()) ?? Data("{}".utf8)
 FileHandle.standardOutput.write(output)
 FileHandle.standardOutput.write(Data([10]))

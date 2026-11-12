@@ -8,7 +8,7 @@ struct HomeView: View {
         VStack(spacing: 16) {
             overview
             Rectangle().fill(.white.opacity(0.1)).frame(height: 1)
-            CodexUsageView(store: shell.codexUsage, shell: shell)
+            UsageSection(shell: shell)
         }.frame(width: 520)
     }
     private var overview: some View {

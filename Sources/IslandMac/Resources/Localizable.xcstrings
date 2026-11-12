@@ -930,6 +930,54 @@
         }
       }
     },
+    "usageCodexMissing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex CLI not found"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex CLI tidak ditemukan"
+          }
+        }
+      }
+    },
+    "usageClaudeSetup": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install the Claude status line relay to show limits"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pasang relay status line Claude untuk menampilkan limit"
+          }
+        }
+      }
+    },
+    "usageObserved": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reported by Claude Code at"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dilaporkan Claude Code pukul"
+          }
+        }
+      }
+    },
     "usageResetIn": {
       "localizations": {
         "en": {
