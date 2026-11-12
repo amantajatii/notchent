@@ -6,6 +6,24 @@ A native Mac notch companion for monitoring coding agents, receiving notificatio
 
 Notchent is a native menu bar app with Home, Spotify, Files, and an integrated terminal. Requires macOS 14 or later. **The MVP is incomplete:** agent support and live validation vary by integration, as detailed below. See the [acceptance record](docs/validation/mvp-acceptance.md) for validation evidence.
 
+## Install
+
+Install a release build into `/Applications` (quits a running Notchent, replaces it atomically, then opens it):
+
+```sh
+scripts/install-app.sh                          # or: --destination DIR, --no-open
+```
+
+## Releases
+
+A release is a git tag `vX.Y.Z`. Pushing the tag (or running the Release workflow manually with a `version` input) builds on GitHub Actions and publishes `Notchent-X.Y.Z.zip` and `Notchent-X.Y.Z.zip.sha256` to GitHub Releases. To build the same assets locally:
+
+```sh
+scripts/package-release.sh X.Y.Z                # writes .build/release/Notchent-X.Y.Z.zip{,.sha256}
+```
+
+Release builds are ad-hoc signed and not notarized.
+
 ## Build and launch
 
 From the repository root, with Apple Command Line Tools active:

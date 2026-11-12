@@ -19,6 +19,7 @@ struct SettingsView: View {
                     }.labelsHidden().frame(width: controlWidth)
                 }
             }
+            UpdateSection(store: shell.updates, shell: shell)
             if let error = shell.persistenceError { Text(error).font(IslandDesign.caption).foregroundStyle(IslandDesign.danger) }
         }
         .font(IslandDesign.body)

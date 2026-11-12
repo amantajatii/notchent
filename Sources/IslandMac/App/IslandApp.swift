@@ -33,6 +33,7 @@ import IslandCore
     /// Reads a local file written by the Claude status line relay, so it can poll often.
     let claudeUsage = UsageStore(client: NativeClaudeUsageClient(), interval: 30)
     let launchAtLogin = LaunchAtLoginStore()
+    let updates = UpdateStore()
     init(store: SettingsStore = SettingsStore(), localizations: Bundle = .main) {
         self.store = store
         self.localizations = localizations
@@ -69,6 +70,7 @@ import IslandCore
         shell.agents.start(terminals: shell.terminals) { [weak shell] count in shell?.dispatch?(.pendingChanged(count)) }
         shell.codexUsage.start()
         shell.claudeUsage.start()
+        shell.updates.start()
         shell.fileSummaryView = AnyView(FileShelfSummary(shell: shell, access: shell.files))
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "capsule.fill", accessibilityDescription: "Notchent")
@@ -114,5 +116,5 @@ import IslandCore
         for id in shell.terminals.sessionIDs { shell.terminals.close(id) }
         return .terminateNow
     }
-    func applicationWillTerminate(_ notification: Notification) { shell.codexUsage.stop(); shell.claudeUsage.stop(); shell.agents.stop(); controller.stop() }
+    func applicationWillTerminate(_ notification: Notification) { shell.codexUsage.stop(); shell.claudeUsage.stop(); shell.updates.stop(); shell.agents.stop(); controller.stop() }
 }
