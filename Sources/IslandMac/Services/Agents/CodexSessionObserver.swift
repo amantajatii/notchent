@@ -103,8 +103,13 @@ struct CodexSessionObserver {
             if role == "user" && ["<environment_context>", "<external_codex_apps_open_page>"].contains(where: { text.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix($0) }) { return nil }
             return text
         }.joined(separator: "\n")
-        guard !text.isEmpty else { return nil }
-        return AgentChatEntry(id: "\(index)", role: role == "user" ? "userMessage" : "agentMessage", text: text)
+        let images = content.compactMap { part -> String? in
+            guard part["type"] as? String == "input_image" else { return nil }
+            return part["image_url"] as? String
+        }
+        guard !text.isEmpty || !images.isEmpty else { return nil }
+        return AgentChatEntry(id: payload["id"] as? String ?? "\(index)", role: role == "user" ? "userMessage" : "agentMessage",
+                              text: text, images: images, clientID: payload["clientId"] as? String)
     }
 
     static func readChat(session: SessionID) throws -> [AgentChatEntry] {

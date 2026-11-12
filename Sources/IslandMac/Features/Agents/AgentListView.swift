@@ -3,9 +3,6 @@ import IslandCore
 
 @MainActor private final class AgentDetailState: ObservableObject {
     @Published var replyAgentID: String?
-    @Published var messages: [AgentChatEntry] = []
-    @Published var chatLoading = false
-    @Published var chatError = false
     @Published var contentHeight: CGFloat = 120
 }
 
@@ -108,35 +105,9 @@ struct AgentListView: View {
                     Button { detailState.replyAgentID = nil } label: { Image(systemName: "xmark").frame(width: 24, height: 24) }
                         .accessibilityLabel(shell.text("back"))
                 }
-                ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
-                        if detailState.chatLoading { ProgressView().controlSize(.small) }
-                        else if detailState.chatError { Text(shell.text("chatUnavailable")).foregroundStyle(.secondary).font(.caption) }
-                        ForEach(detailState.messages) { message in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(message.role == "userMessage" ? "You" : "Codex").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
-                                Text(message.text).font(.system(size: 12)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                            }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
-                                .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
-                        }
-                        Color.clear.frame(height: 1).id("chat-bottom")
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                }.frame(height: 180)
-                .onChange(of: detailState.chatLoading) { _, loading in
-                    if !loading { proxy.scrollTo("chat-bottom", anchor: .bottom) }
-                }
-                }
-                .task(id: session) {
-                    detailState.messages = []; detailState.chatError = false; detailState.chatLoading = true
-                    defer { detailState.chatLoading = false }
-                    do { detailState.messages = try await registry.readChat(for: session) }
-                    catch { detailState.chatError = true }
-                }
-                if session.ownerInstanceID == "codex-observed" {
-                    Text(shell.text("desktopReplyUnavailable")).font(.caption).foregroundStyle(.secondary)
-                }
-                AgentChatComposer(draft: registry.chatDraft(for: session), registry: registry, shell: shell, session: session)
+                AgentConversationView(draft: registry.chatDraft(for: session), registry: registry, shell: shell,
+                                      session: session, activity: agent.activity, summary: agent.summary)
+                    .id(session)
             }
             if detailState.replyAgentID != agent.id {
             HStack(spacing: 8) {
@@ -173,6 +144,73 @@ struct AgentListView: View {
 
 }
 
+private struct AgentConversationView: View {
+    @ObservedObject var draft: AgentChatDraft
+    @ObservedObject var registry: AgentRegistry
+    @ObservedObject var shell: IslandShell
+    let session: SessionID
+    let activity: String?
+    let summary: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 8) {
+                        if draft.historyLoading && draft.history.isEmpty { ProgressView().controlSize(.small) }
+                        if draft.historyError { Text(shell.text("chatUnavailable")).foregroundStyle(.secondary).font(.caption) }
+                        ForEach(draft.history) { message in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(message.role == "userMessage" ? "You" : "Codex").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+                                if !message.text.isEmpty {
+                                    Text(message.text).font(.system(size: 12)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                ForEach(Array(message.images.enumerated()), id: \.offset) { _, image in
+                                    ChatImagePreview(source: image)
+                                }
+                                if let status = message.deliveryStatus {
+                                    Text(shell.text(status)).font(.system(size: 10)).foregroundStyle(.secondary)
+                                }
+                            }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                                .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        Color.clear.frame(height: 1).id("chat-bottom")
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                }.frame(height: 180)
+                .onChange(of: draft.history.map(\.id)) { _, _ in proxy.scrollTo("chat-bottom", anchor: .bottom) }
+            }
+            if session.ownerInstanceID == "codex-observed" {
+                Text(shell.text("desktopReplyUnavailable")).font(.caption).foregroundStyle(.secondary)
+            }
+            AgentChatComposer(draft: draft, registry: registry, shell: shell, session: session)
+        }
+        .task(id: [String(draft.queuedCount), String(registry.chatRevisions[session.terminalSessionKey, default: 0]), activity ?? "", summary ?? ""]) {
+            draft.historyLoading = true
+            defer { draft.historyLoading = false }
+            do {
+                let entries = try await registry.readChat(for: session)
+                guard !Task.isCancelled else { return }
+                draft.updateHistory(entries); draft.historyError = false
+            } catch {
+                if !Task.isCancelled { draft.historyError = true }
+            }
+        }
+    }
+}
+
+private struct ChatImagePreview: View {
+    let source: String
+    var body: some View {
+        if source.hasPrefix("data:image/"), let comma = source.firstIndex(of: ","),
+           let data = Data(base64Encoded: String(source[source.index(after: comma)...])), let image = NSImage(data: data) {
+            Image(nsImage: image).resizable().scaledToFit().frame(maxWidth: 160, maxHeight: 90)
+                .clipShape(RoundedRectangle(cornerRadius: 6)).accessibilityLabel("Attached image")
+        } else {
+            Label("Image", systemImage: "photo").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
 private struct AgentChatComposer: View {
     @ObservedObject var draft: AgentChatDraft
     @ObservedObject var registry: AgentRegistry
@@ -181,17 +219,36 @@ private struct AgentChatComposer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if !draft.images.isEmpty {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(draft.images.enumerated()), id: \.offset) { index, image in
+                            ChatImagePreview(source: image)
+                                .overlay(alignment: .topTrailing) {
+                                    Button { draft.images.remove(at: index) } label: {
+                                        Image(systemName: "xmark.circle.fill").foregroundStyle(.white, .black)
+                                    }.buttonStyle(.plain).accessibilityLabel(shell.text("chatRemoveImage"))
+                                        .disabled(draft.sending || draft.uncertain)
+                                }
+                        }
+                    }.padding(2)
+                }
+            }
             HStack(spacing: 10) {
-                TextField(shell.text("chatPlaceholder"), text: $draft.text)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .onSubmit { send() }
-                    .disabled(draft.sending || draft.uncertain)
+                ZStack(alignment: .topLeading) {
+                    if draft.text.isEmpty {
+                        Text(shell.text("chatPlaceholder")).font(.system(size: 13)).foregroundStyle(.secondary)
+                            .allowsHitTesting(false)
+                    }
+                    AgentChatInput(draft: draft, placeholder: shell.text("chatPlaceholder"), send: send)
+                }.frame(height: 36)
                 Button { send() } label: {
                     Image(systemName: "arrow.up").font(.system(size: 12, weight: .semibold))
                         .frame(width: 30, height: 30)
-                        .background(.white.opacity(0.12), in: Circle())
+                        .foregroundStyle(canSend ? Color.black : Color.white.opacity(0.5))
+                        .background(canSend ? Color.white : Color.white.opacity(0.12), in: Circle())
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel(shell.text("send"))
                 .disabled(!canSend)
             }
@@ -208,8 +265,7 @@ private struct AgentChatComposer: View {
         .onDisappear { shell.dispatch?(.inputChanged(false)) }
     }
     private var canSend: Bool {
-        registry.codexConnected && !draft.sending && !draft.uncertain &&
-        !draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draft.text.utf8.count <= 32_768
+        registry.codexConnected && draft.canSubmit
     }
     private func send() {
         guard canSend else { return }

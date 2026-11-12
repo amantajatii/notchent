@@ -142,6 +142,7 @@ actor CodexAdapter: AgentAdapter {
     private var pending: [PromptID: CodexPendingRequest] = [:]
     private var submitted = Set<PromptID>()
     private var resolved = Set<PromptID>()
+    private(set) var chatRevisions: [String: Int] = [:]
     private var refreshing = false
     private let hookMailbox = CodexHookMailbox()
     private var hookPending: [PromptID: CodexHookPending] = [:]
@@ -227,11 +228,7 @@ actor CodexAdapter: AgentAdapter {
         if let daemon, daemon.pid != owner.pid || daemon.birth != owner.birth { await disconnect() }
         do {
             if socket == nil {
-                let path = home.appendingPathComponent("app-server-control/app-server-control.sock").resolvingSymlinksInPath()
-                let attributes = try FileManager.default.attributesOfItem(atPath: path.path)
-                guard attributes[.type] as? FileAttributeType == .typeSocket,
-                      (attributes[.ownerAccountID] as? NSNumber)?.uint32Value == getuid(),
-                      let permissions = attributes[.posixPermissions] as? NSNumber, permissions.intValue & 0o077 == 0 else { return }
+                guard let path = CodexControlSocket.trustedPath(codexHome: home) else { return }
                 let client = CodexSocket(); socket = client; daemon = owner
                 let token = connectionID
                 try await client.connect(path: path)
@@ -354,6 +351,9 @@ actor CodexAdapter: AgentAdapter {
         guard token == connectionID, let value = try? object(data), let method = value["method"] as? String,
               let params = value["params"] as? [String: Any], let id = params["threadId"] as? String,
               let session = sessions[id] else { return }
+        if ["item/completed", "turn/completed"].contains(method) {
+            chatRevisions[id, default: 0] += 1
+        }
         if method == "serverRequest/resolved", let raw = params["requestId"], let rawID = CodexPendingRequest.requestID(raw) {
             let promptID = PromptID(sessionID: session, localRequestID: rawID.base64EncodedString())
             pending.removeValue(forKey: promptID)

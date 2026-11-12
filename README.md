@@ -26,6 +26,8 @@ To upgrade, choose **Quit** in the old instance first, complete any confirmation
 
 ## Usage and permissions
 
+Enable **Launch at Login** in Settings to start Notchent automatically after signing in to macOS. The toggle reads the system Login Items status. If macOS requires approval, use **Open Login Items** to finish enabling it in System Settings. Turning the toggle off removes the login registration without quitting Notchent. Keep the app bundle in a stable location before enabling this; deleting the debug build also removes the bundle needed at login. The app does not enable this option automatically.
+
 Home prioritizes Music/Spotify, with summaries for Agents and Files. Settings stores Language (English by default, or Bahasa Indonesia), Open delay, Close delay, Full screen, and File storage. Terminal text, filenames, and agent request contents are not translated.
 
 Open Spotify yourself, then use **Connect Spotify** when you want to grant Automation permission. macOS may ask for approval; you control access through the dialog or System Settings → Privacy & Security → Automation. Polling does not silently request permission or launch Spotify or music playback. Consent, denied, and unavailable states are distinct. Metadata, artwork, and playback controls have not been verified live on the latest bundle. Opening the panel does not require Accessibility or Screen Recording permission; additional permissions do not enable unimplemented agent response features.
@@ -55,7 +57,7 @@ Basic discovery does not install hooks/plugins or modify CLI/shell configuration
 
 The adapter observes loaded, active threads through the user's existing daemon without requiring a Codex process with a TTY. Verified daemon sessions appear as separate cards from process candidates. Subscriptions use thread/resume without configuration overrides, check loaded state before and after, and detach when idle or exiting. The protocol does not provide an atomic join against unload; that race has not been verified safe live. Resume also changes daemon client attribution and may keep a monitored thread loaded longer. This subscription path does not read conversation history or terminal output.
 
-In Agents, select a Codex session and use the chat field to continue the same conversation. Enter or the arrow button queues text through thread/queue/add using that session's UUID; it does not create or resume a conversation on another server. Queued means the queue accepted the message, not that a reply is complete. Drafts are stored per session. If delivery is uncertain, check the original conversation before reopening the draft to send it again. Completed replies follow local summary monitoring; streaming and desktop approval responses are unavailable. Delivery through to actual processing by Codex has not been verified end to end.
+In Agents, select a Codex session and use the chat field to continue the same conversation. Enter or the arrow button queues text through thread/queue/add using that session's UUID; it does not create or resume a conversation on another server. Queued means the queue accepted the message, not that a reply is complete. Text and pasted-image drafts are kept per session while the app is running. Paste an image with **⌘V** in the composer; review its preview or remove it before sending. Images can be sent with or without text. Attachments must fit within the 4 MB protocol message limit after encoding; oversized images are rejected with the draft preserved. The send button turns white when a valid message is ready and the connection is available. Confirmed queued messages stay in the chat history until matched with their server history entry by client message ID. History refreshes after queue confirmation and observed completion changes. If delivery is uncertain, check the original conversation before reopening the draft to send it again. Completed replies follow local summary monitoring; streaming and desktop approval responses are unavailable. Delivery through to actual processing by Codex has not been verified end to end.
 
 ### Optional local Codex hooks
 
@@ -66,6 +68,20 @@ python3 scripts/install-codex-hook.py --helper .build/apps/Notchent.app/Contents
 ```
 
 After installation, review and trust the IslandMac definitions through `/hooks` in Codex CLI. The installer does not modify trust records or security mode. Permission prompts offer allow once, deny, or continue in Codex. Desktop preferences are previewed and handed off to the original UI; PreToolUse cannot return tool answers. Cloud-orchestrated Work does not support all of these local hooks.
+
+### Plan usage on Home
+
+Home shows the remaining Codex and Claude plan limits for each window (for example 5h and 7d), with reset times. Numbers refresh shortly after a window resets and at least every 5 minutes for Codex and every 30 seconds for Claude. A failed read shows "unavailable" rather than old numbers.
+
+**Codex** limits come from `account/rateLimits/read`. Notchent asks the shared Codex daemon when its control socket is present and private to you; otherwise it briefly starts its own `codex app-server`. Both paths only read account limits and never open or join a thread. The `codex` executable is searched in `~/.local/bin`, `~/.npm-global/bin`, `~/.bun/bin`, `~/.volta/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, and `PATH`.
+
+**Claude** limits use the `rate_limits` field that Claude Code documents for status line commands. It is only available to Pro and Max subscribers, after the first response in a session. Install the relay once:
+
+```sh
+python3 scripts/install-claude-statusline.py --helper .build/apps/Notchent.app/Contents/MacOS/IslandHook
+```
+
+This sets `statusLine` in `~/.claude/settings.json` (with a backup) to `IslandHook claude-statusline`. The status line shows the model and used percentages. The helper saves only `rate_limits` to `~/Library/Application Support/IslandMac/Usage/claude-rate-limits.json` (owner-only), never prompts, paths, or transcripts. An existing, different status line is never replaced unless you pass `--replace`. Claude limits are as fresh as the last Claude Code response; hover over the row to see when they were reported.
 
 ### File drag activation
 

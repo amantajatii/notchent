@@ -930,6 +930,86 @@
         }
       }
     },
+    "usageCodexMissing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex CLI not found"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex CLI tidak ditemukan"
+          }
+        }
+      }
+    },
+    "usageClaudeSetup": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install the Claude status line relay to show limits"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pasang relay status line Claude untuk menampilkan limit"
+          }
+        }
+      }
+    },
+    "usageObserved": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reported by Claude Code at"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dilaporkan Claude Code pukul"
+          }
+        }
+      }
+    },
+    "usageResetIn": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset in"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset dalam"
+          }
+        }
+      }
+    },
+    "deliverySentCompact": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent; confirmation pending…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terkirim; menunggu konfirmasi…"
+          }
+        }
+      }
+    },
     "deliverySent": {
       "localizations": {
         "en": {
@@ -1282,6 +1362,102 @@
         }
       }
     },
+    "chatRemoveImage": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove image"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hapus gambar"
+          }
+        }
+      }
+    },
+    "chatImageTooLarge": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Image could not be attached. Try a smaller image; attachments must fit within the 4 MB message limit."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gambar tidak dapat dilampirkan. Coba gambar lebih kecil; lampiran harus muat dalam batas pesan 4 MB."
+          }
+        }
+      }
+    },
+    "launchAtLogin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Launch at Login"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buka Saat Login"
+          }
+        }
+      }
+    },
+    "loginApprovalRequired": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow Notchent in macOS Login Items to finish enabling auto-start."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Izinkan Notchent di Login Items macOS untuk mengaktifkan buka otomatis."
+          }
+        }
+      }
+    },
+    "openLoginItems": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Login Items"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buka Login Items"
+          }
+        }
+      }
+    },
+    "loginRegistrationError": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not update Launch at Login. Keep Notchent in a stable location, open its app bundle, and try again."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak dapat memperbarui Buka Saat Login. Simpan Notchent di lokasi tetap, buka bundle aplikasinya, lalu coba lagi."
+          }
+        }
+      }
+    },
     "chatSending": {
       "localizations": {
         "en": {
@@ -1454,6 +1630,150 @@
           "stringUnit": {
             "state": "translated",
             "value": "Jawab di Codex"
+          }
+        }
+      }
+    },
+    "usageRemaining": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remaining"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sisa kuota"
+          }
+        }
+      }
+    },
+    "usageLoading": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading limits…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memuat kuota…"
+          }
+        }
+      }
+    },
+    "usageUnavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limits unavailable"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kuota belum tersedia"
+          }
+        }
+      }
+    },
+    "usageRefresh": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh Codex limits"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perbarui kuota Codex"
+          }
+        }
+      }
+    },
+    "usageUpdating": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updating…"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memperbarui…"
+          }
+        }
+      }
+    },
+    "usageReset": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resets"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset"
+          }
+        }
+      }
+    },
+    "usageWindow": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limit"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kuota"
+          }
+        }
+      }
+    },
+    "promptExpand": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show details"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lihat detail"
+          }
+        }
+      }
+    },
+    "promptCollapse": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show less"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ringkas"
           }
         }
       }

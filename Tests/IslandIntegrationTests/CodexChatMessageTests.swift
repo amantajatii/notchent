@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import IslandCore
@@ -47,6 +48,64 @@ struct CodexChatMessageTests {
         let processOnly = SessionID(ownerInstanceID: "process", pid: 100, processStartTime: 1, terminalSessionKey: session.terminalSessionKey)
         #expect(throws: AgentRoutingError.invalidResponse) {
             try CodexChatMessage(session: processOnly, text: "Hello", clientID: UUID().uuidString).parameters()
+        }
+    }
+    @Test @MainActor func queuedMessagesStayInHistoryUntilTheirExactServerEchoArrives() throws {
+        let draft = AgentChatDraft()
+        draft.updateHistory([AgentChatEntry(id: "old", role: "userMessage", text: "Repeat")])
+        draft.text = "Repeat"
+        let first = try #require(draft.begin(for: session))
+        draft.recordQueued(first)
+        draft.sending = false
+        draft.text = "Repeat"
+        let second = try #require(draft.begin(for: session))
+        draft.recordQueued(second)
+        #expect(draft.text.isEmpty)
+        #expect(draft.history.count == 3)
+        draft.updateHistory([AgentChatEntry(id: "old", role: "userMessage", text: "Repeat")])
+        #expect(draft.history.count == 3, "A stale refresh must not erase queued messages")
+        let echo = AgentChatEntry(id: "server", role: "userMessage", text: "Repeat", clientID: first.clientID)
+        draft.updateHistory([AgentChatEntry(id: "old", role: "userMessage", text: "Repeat"), echo])
+        #expect(draft.history.map(\.id) == ["old", "server", second.clientID])
+        #expect(draft.history.last?.deliveryStatus == "chatQueued")
+    }
+    @Test @MainActor func pastedImageCanBeSentWithoutTextAndAckMustMatchItsContents() throws {
+        let board = NSPasteboard.withUniqueName()
+        defer { board.releaseGlobally() }
+        let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+        let png = try #require(bitmap.representation(using: .png, properties: [:]))
+        board.setData(png, forType: .png)
+        let draft = AgentChatDraft()
+        #expect(draft.pasteImages(from: board))
+        #expect(draft.images.count == 1 && draft.canSubmit)
+        let message = try #require(draft.begin(for: session))
+        let params = try #require(JSONSerialization.jsonObject(with: message.parameters()) as? [String: Any])
+        let input = try #require(params["input"] as? [[String: Any]])
+        #expect(input.count == 1 && input[0]["type"] as? String == "image")
+        #expect((input[0]["url"] as? String)?.hasPrefix("data:image/png;base64,") == true)
+        let ack: [String: Any] = ["queuedSubmission": ["id": "queued-image", "clientUserMessageId": message.clientID, "input": input]]
+        #expect(message.acknowledged(by: try JSONSerialization.data(withJSONObject: ack)))
+        let wrong: [String: Any] = ["queuedSubmission": ["id": "queued-image", "clientUserMessageId": message.clientID, "input": [["type": "image", "url": "different"]]]]
+        #expect(!message.acknowledged(by: try JSONSerialization.data(withJSONObject: wrong)))
+        draft.recordQueued(message)
+        #expect(draft.images.isEmpty && draft.history.last?.images == message.images)
+        #expect(!draft.pasteImages(from: board), "A pending send must not accept another paste")
+    }
+    @Test func historyPreservesImageOnlyMessagesAndClientIdentity() throws {
+        let payload: [String: Any] = ["thread": ["turns": [["items": [
+            ["id": "image-only", "clientId": "client", "type": "userMessage", "content": [["type": "image", "url": "data:image/png;base64,test"]]]
+        ]]]]]
+        let entry = try #require(AgentChatEntry.parse(JSONSerialization.data(withJSONObject: payload)).first)
+        #expect(entry.images.count == 1 && entry.clientID == "client")
+    }
+    @Test @MainActor func invalidAndOversizedImagePayloadsKeepTheDraftUnsent() throws {
+        let draft = AgentChatDraft()
+        draft.images = ["https://example.com/image.png"]
+        #expect(!draft.canSubmit && draft.begin(for: session) == nil)
+        let oversized = "data:image/png;base64," + Data(repeating: 0, count: CodexWebSocketCodec.maximumBytes).base64EncodedString()
+        #expect(throws: AgentRoutingError.invalidResponse) {
+            try CodexChatMessage(session: session, text: "", clientID: UUID().uuidString, images: [oversized]).parameters()
         }
     }
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ISLAND_CODEX_LIVE"] == "1", "Read-only queue capability check against existing daemon"))

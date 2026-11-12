@@ -29,6 +29,10 @@ import IslandCore
     let files = NativeFileAccess()
     let terminals = TerminalSessionStore()
     let agents = AgentRegistry()
+    let codexUsage = UsageStore(client: NativeCodexUsageClient())
+    /// Reads a local file written by the Claude status line relay, so it can poll often.
+    let claudeUsage = UsageStore(client: NativeClaudeUsageClient(), interval: 30)
+    let launchAtLogin = LaunchAtLoginStore()
     init(store: SettingsStore = SettingsStore(), localizations: Bundle = .main) {
         self.store = store
         self.localizations = localizations
@@ -43,7 +47,12 @@ import IslandCore
 
 @main struct IslandApp: App {
     @NSApplicationDelegateAdaptor(IslandAppDelegate.self) var delegate
-    var body: some Scene { Settings { EmptyView() } }
+    var body: some Scene {
+        Settings {
+            SettingsView(shell: delegate.shell, launchAtLogin: delegate.shell.launchAtLogin)
+                .padding(20).preferredColorScheme(.dark)
+        }
+    }
 }
 
 @MainActor final class IslandAppDelegate: NSObject, NSApplicationDelegate {
@@ -58,6 +67,8 @@ import IslandCore
         shell.featureViews[.agents] = AnyView(AgentListView(registry: shell.agents, shell: shell))
         shell.agents.completionChanged = { [weak shell] in shell?.dispatch?(.agentCompleted) }
         shell.agents.start(terminals: shell.terminals) { [weak shell] count in shell?.dispatch?(.pendingChanged(count)) }
+        shell.codexUsage.start()
+        shell.claudeUsage.start()
         shell.fileSummaryView = AnyView(FileShelfSummary(shell: shell, access: shell.files))
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "capsule.fill", accessibilityDescription: "Notchent")
@@ -103,5 +114,5 @@ import IslandCore
         for id in shell.terminals.sessionIDs { shell.terminals.close(id) }
         return .terminateNow
     }
-    func applicationWillTerminate(_ notification: Notification) { shell.agents.stop(); controller.stop() }
+    func applicationWillTerminate(_ notification: Notification) { shell.codexUsage.stop(); shell.claudeUsage.stop(); shell.agents.stop(); controller.stop() }
 }
