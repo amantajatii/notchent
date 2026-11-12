@@ -5,7 +5,8 @@ cd "$(dirname "$0")/.."
 [ $# -eq 1 ] || { echo 'Usage: scripts/package-release.sh X.Y.Z' >&2; exit 2; }
 version=$1
 printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "Invalid version '$version': expected X.Y.Z" >&2; exit 2; }
-scripts/build-app.sh --release --version "$version" >/dev/null
+# Build logs go to stderr so CI shows compiler errors; stdout keeps only the artifact paths.
+scripts/build-app.sh --release --version "$version" >&2
 out=.build/release
 zip_name="Notchent-$version.zip"
 mkdir -p "$out"
