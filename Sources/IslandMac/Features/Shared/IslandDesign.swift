@@ -42,6 +42,27 @@ enum IslandDesign {
     static let metric = Font.system(size: 12, weight: .semibold, design: .rounded)
     /// Big glanceable figures, like "0:22" on a timer.
     static let display = Font.system(size: 26, weight: .regular, design: .rounded)
+    /// Live Activity hero numbers ("$104.02", "22m"): heavy, rounded, tightly tracked.
+    static let hero = Font.system(size: 30, weight: .bold, design: .rounded)
+    static let heroTracking: CGFloat = -0.6
+    /// Small uppercase captions under or above a value ("THIS MONTH").
+    static let label = Font.system(size: 10, weight: .semibold)
+    static let labelTracking: CGFloat = 0.6
+
+    // Motion: critically damped by default (Apple ships damping 1.0, response ~0.35 for UI moves).
+    static let spring = Animation.spring(response: 0.35, dampingFraction: 1)
+}
+
+extension View {
+    /// An uppercase metric caption with positive tracking for legibility at small sizes.
+    func islandLabel(_ color: Color = IslandDesign.secondary) -> some View {
+        self.font(IslandDesign.label).tracking(IslandDesign.labelTracking).textCase(.uppercase).foregroundStyle(color)
+    }
+
+    /// A Live Activity hero figure.
+    func islandHero(_ color: Color = IslandDesign.primary) -> some View {
+        self.font(IslandDesign.hero).tracking(IslandDesign.heroTracking).monospacedDigit().foregroundStyle(color)
+    }
 }
 
 /// Per-feature colours. Apple keeps chrome neutral, so most features are white (rendered grey
@@ -75,6 +96,16 @@ extension View {
     func islandCard(padding: CGFloat = IslandDesign.cardPadding) -> some View {
         self.padding(padding)
             .background(IslandDesign.card, in: RoundedRectangle(cornerRadius: IslandDesign.cardRadius, style: .continuous))
+    }
+}
+
+/// Instant press feedback (scale on press-down), per Apple's "respond on pointer-down".
+struct PressableStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.8 : 1)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 

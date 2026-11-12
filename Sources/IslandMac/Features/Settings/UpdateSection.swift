@@ -10,21 +10,23 @@ struct UpdateSection: View {
             HStack(spacing: -6) {
                 IslandGlyph(symbol: "arrow.triangle.2.circlepath", tint: .gray, size: 26, shape: .squircle)
                     .padding(.leading, IslandDesign.cardPadding)
-                IslandFormRow(shell.text("updateTitle"), subtitle: status) { action }
+                IslandFormRow(shell.text("updateVersion"), subtitle: status) {
+                    HStack(spacing: 10) {
+                        Text(store.currentVersion?.description ?? "–").font(IslandDesign.body)
+                            .foregroundStyle(IslandDesign.secondary).monospacedDigit()
+                        action
+                    }
+                }
             }
         }
     }
 
-    private var versionText: String {
-        "\(shell.text("updateVersion")) \(store.currentVersion?.description ?? "–")"
-    }
-
-    private var status: String {
+    private var status: String? {
         switch store.phase {
-        case .idle: versionText
+        case .idle: nil
         case .checking: shell.text("updateChecking")
-        case .upToDate: "\(shell.text("updateUpToDate")) · \(versionText)"
-        case .available(let release): "\(shell.text("updateAvailable")) \(release.version) · \(versionText)"
+        case .upToDate: shell.text("updateUpToDate")
+        case .available(let release): "\(shell.text("updateAvailable")) \(release.version)"
         case .installing: shell.text("updateInstalling")
         case .failed(let error): shell.text(error.messageKey)
         }

@@ -8,9 +8,12 @@ struct SettingsView: View {
     private let controlWidth: CGFloat = 170
 
     var body: some View {
-        VStack(spacing: IslandDesign.gap) {
+        VStack(alignment: .leading, spacing: 6) {
+            caption("settingsGeneral", fallback: "General")
             generalSection
+            caption("settingsPanel", fallback: "Panel").padding(.top, 10)
             panelSection
+            Text(shell.text("files")).islandLabel().padding(.leading, IslandDesign.cardPadding).padding(.top, 10)
             IslandFormSection {
                 settingsRow(shell.text("storage"), symbol: "externaldrive.fill", tint: .gray) {
                     Picker(shell.text("storage"), selection: $shell.settings.fileStorage) {
@@ -19,6 +22,7 @@ struct SettingsView: View {
                     }.labelsHidden().frame(width: controlWidth)
                 }
             }
+            Text(shell.text("updateTitle")).islandLabel().padding(.leading, IslandDesign.cardPadding).padding(.top, 10)
             UpdateSection(store: shell.updates, shell: shell)
             if let error = shell.persistenceError { Text(error).font(IslandDesign.caption).foregroundStyle(IslandDesign.danger) }
         }
@@ -28,6 +32,12 @@ struct SettingsView: View {
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)) { _ in
             launchAtLogin.refresh()
         }
+    }
+
+    /// Section caption; uses the localized string when the key exists, otherwise the English fallback.
+    private func caption(_ key: String, fallback: String) -> some View {
+        let localized = shell.text(key)
+        return Text(localized == key ? fallback : localized).islandLabel().padding(.leading, IslandDesign.cardPadding)
     }
 
     private var generalSection: some View {
@@ -43,7 +53,7 @@ struct SettingsView: View {
                 HStack(spacing: 10) {
                     if launchAtLogin.status == .requiresApproval {
                         Button(shell.text("openLoginItems")) { launchAtLogin.openSystemSettings() }
-                            .buttonStyle(IslandPillButtonStyle(emphasis: .tinted, tint: .blue))
+                            .buttonStyle(IslandPillButtonStyle(emphasis: .tinted, tint: IslandDesign.accent))
                     }
                     Toggle(shell.text("launchAtLogin"), isOn: Binding(
                         get: { launchAtLogin.isOn }, set: { launchAtLogin.setEnabled($0) }

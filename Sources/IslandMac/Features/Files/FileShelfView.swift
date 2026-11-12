@@ -7,49 +7,67 @@ import UniformTypeIdentifiers
 struct FileShelfView: View {
     @ObservedObject var shell: IslandShell
     @ObservedObject var access: NativeFileAccess
+    private static let maximumListHeight: CGFloat = 232
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             if access.items.isEmpty {
-                IslandEmptyState(title: shell.text("shelfEmpty"), symbol: "tray", message: shell.text("drop"))
+                IslandEmptyState(title: shell.text("shelfEmpty"), symbol: "tray", message: shell.text("drop"), tint: IslandTint.files)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(access.items) { item in FileTile(shell: shell, access: access, item: item) }
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(shell.text("files")).islandLabel()
+                    Text("\(access.items.count)").islandHero().contentTransition(.numericText())
+                }
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 2) {
+                        ForEach(access.items) { item in FileRow(shell: shell, access: access, item: item) }
                     }
-                }.frame(width: IslandDesign.contentWidth)
+                }.frame(maxHeight: Self.maximumListHeight)
             }
             if let error = access.error { Text(error).font(IslandDesign.caption).foregroundStyle(IslandDesign.danger) }
-        }.frame(width: IslandDesign.contentWidth, alignment: .leading)
+        }
+        .padding(.horizontal, 4)
+        .frame(width: IslandDesign.contentWidth, alignment: .leading)
+        .animation(IslandDesign.spring, value: access.items.count)
     }
 }
 
-private struct FileTile: View {
+private struct FileRow: View {
     @ObservedObject var shell: IslandShell
     @ObservedObject var access: NativeFileAccess
     let item: ShelfItem
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var isSelected: Bool { access.selected == item.id }
 
     var body: some View {
-        VStack(spacing: 6) {
+        HStack(spacing: 12) {
             FileThumbnail(item: item, access: access)
-                .frame(width: 64, height: 58)
-                .overlay(FileDragSource(item: item, access: access, dragEnded: { shell.dispatch?(.shelfDragEnded) }) { access.selected = item.id })
-            Text(item.displayName).font(IslandDesign.caption).lineLimit(1).truncationMode(.middle)
-                .help(item.displayName)
-            if !item.isAvailable {
-                Text(shell.text("shelfUnavailable")).font(IslandDesign.footnote).foregroundStyle(.orange)
+                .frame(width: 36, height: 36)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.displayName).font(IslandDesign.body).lineLimit(1).truncationMode(.middle)
+                    .help(item.displayName)
+                if !item.isAvailable {
+                    Text(shell.text("shelfUnavailable")).font(IslandDesign.caption).foregroundStyle(IslandDesign.warning)
+                }
             }
-            if isSelected {
-                Button(shell.text("shelfRemove")) { access.remove(item.id); access.selected = nil }
-                    .buttonStyle(IslandPillButtonStyle(emphasis: .tinted, tint: IslandDesign.danger)).controlSize(.small)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(FileDragSource(item: item, access: access, dragEnded: { shell.dispatch?(.shelfDragEnded) }) { access.selected = item.id })
+            trailing
         }
-        .frame(width: 96)
-        .padding(8)
-        .background(isSelected ? IslandTint.files.opacity(0.18) : IslandDesign.card,
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(isSelected ? IslandDesign.fill : Color.clear,
                     in: RoundedRectangle(cornerRadius: IslandDesign.rowRadius, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: IslandDesign.rowRadius, style: .continuous)
-            .strokeBorder(isSelected ? IslandTint.files : Color.clear, lineWidth: 1.5))
+        .animation(reduceMotion ? nil : IslandDesign.spring, value: isSelected)
+    }
+
+    @ViewBuilder private var trailing: some View {
+        if isSelected {
+            Button(shell.text("shelfRemove")) { access.remove(item.id); access.selected = nil }
+                .buttonStyle(IslandPillButtonStyle(emphasis: .destructive, tint: IslandDesign.danger))
+        } else {
+            Text(shell.text(item.storageMode == .copy ? "copy" : "reference"))
+                .font(IslandDesign.caption).foregroundStyle(IslandDesign.secondary)
+        }
     }
 }
 

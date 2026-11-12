@@ -5,6 +5,7 @@ struct PromptBannerView: View {
     var body: some View {
         Button { shell.dispatch?(.openPrompt) } label: {
             Label("\(shell.text("pending")): \(shell.state.pendingCount)", systemImage: "bubble.left.fill")
+                .font(.system(size: 12, weight: .semibold))
         }
         .buttonStyle(IslandPillButtonStyle(emphasis: .tinted, tint: IslandDesign.warning))
         .accessibilityLabel(shell.text("openPrompt"))

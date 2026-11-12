@@ -5,6 +5,7 @@ import IslandCore
 struct TerminalFeatureView: View {
     @ObservedObject var store: TerminalSessionStore
     @ObservedObject var shell: IslandShell
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -14,8 +15,6 @@ struct TerminalFeatureView: View {
                     .frame(width: 640, height: 340)
                     .padding(10)
                     .background(Color.black, in: RoundedRectangle(cornerRadius: IslandDesign.cardRadius, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: IslandDesign.cardRadius, style: .continuous)
-                        .strokeBorder(IslandDesign.separator, lineWidth: 1))
                     .accessibilityLabel("Terminal session")
             } else {
                 Button("Start terminal") { startTerminal() }
@@ -37,18 +36,19 @@ struct TerminalFeatureView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
                     ForEach(store.sessionIDs, id: \.self) { id in tab(id) }
-                }.padding(3)
+                }
             }
-            .background(IslandDesign.card, in: Capsule())
             .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
-            Button { startTerminal() } label: { Label("New terminal", systemImage: "plus") }
-                .buttonStyle(IslandPillButtonStyle(emphasis: .tinted, tint: IslandTint.terminal))
+            Button { startTerminal() } label: { Image(systemName: "plus") }
+                .buttonStyle(IslandIconButtonStyle(emphasis: .plain, tint: IslandTint.neutral))
+                .accessibilityLabel("New terminal").help("New terminal")
             Button {
                 shell.dispatch?(.inputChanged(false))
                 shell.dispatch?(.hide)
-            } label: { Text("Hide") }
-                .buttonStyle(IslandPillButtonStyle(emphasis: .plain, tint: .white))
+            } label: { Image(systemName: "chevron.up") }
+                .buttonStyle(IslandIconButtonStyle(emphasis: .plain, tint: IslandTint.neutral))
+                .accessibilityLabel("Hide").help("Hide")
         }
         .frame(width: 660)
     }
@@ -58,22 +58,23 @@ struct TerminalFeatureView: View {
         return HStack(spacing: 0) {
             Button { store.selectedID = id } label: {
                 Text(store.directory(for: id)?.lastPathComponent ?? "Terminal")
-                    .font(IslandDesign.callout.weight(.medium)).lineLimit(1)
-                    .foregroundStyle(isSelected ? IslandTint.terminal : IslandDesign.secondary)
-                    .padding(.leading, 12).padding(.trailing, 6).frame(height: 24)
+                    .font(IslandDesign.callout.weight(isSelected ? .semibold : .regular)).lineLimit(1)
+                    .foregroundStyle(isSelected ? IslandDesign.primary : IslandDesign.secondary)
+                    .padding(.leading, 12).padding(.trailing, 6).frame(height: 28)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableStyle())
             .accessibilityLabel("Open terminal in \(store.directory(for: id)?.path ?? "folder")")
             Button { store.close(id) } label: {
                 Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(IslandDesign.secondary).frame(width: 20, height: 24)
+                    .foregroundStyle(IslandDesign.secondary).frame(width: 20, height: 28)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableStyle())
             .accessibilityLabel("Close terminal")
         }
-        .background(isSelected ? IslandTint.terminal.opacity(0.2) : Color.clear, in: Capsule())
+        .background(isSelected ? IslandDesign.fill : Color.clear, in: Capsule())
+        .animation(reduceMotion ? nil : IslandDesign.spring, value: isSelected)
     }
 
     private func startTerminal() {

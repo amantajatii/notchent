@@ -1,75 +1,139 @@
 import SwiftUI
 import IslandCore
 
-/// Home: a Control Center-style grid of modules above the plan usage widgets.
+/// Home, laid out like an expanded Live Activity: content sits directly on the black surface,
+/// the most important values are the largest things on screen, and colour only marks state.
 struct HomeView: View {
     @ObservedObject var shell: IslandShell
     @ObservedObject var spotify: SpotifyStore
 
-    private static let nowPlayingWidth: CGFloat = 330
-    private static let artworkSize: CGFloat = 56
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            HStack(alignment: .top, spacing: 20) {
+                NowPlayingActivity(shell: shell, spotify: spotify).frame(maxWidth: .infinity, alignment: .leading)
+                HomeAgentsMetric(registry: shell.agents, shell: shell)
+                HomeFilesMetric(access: shell.files, shell: shell)
+            }
+            UsageSection(shell: shell)
+        }
+        .padding(.horizontal, 4)
+        .frame(width: IslandDesign.contentWidth, alignment: .leading)
+    }
+}
+
+/// A metric that opens its feature: uppercase caption and hero number, plus a detail line
+/// only when something needs attention.
+private struct HomeMetric: View {
+    static let width: CGFloat = 64
+
+    let label: String
+    let value: String
+    var detail: String?
+    var detailColor: Color = IslandDesign.secondary
+    let action: () -> Void
 
     var body: some View {
-        VStack(spacing: IslandDesign.gap) {
-            HStack(alignment: .top, spacing: IslandDesign.gap) {
-                nowPlaying.frame(width: Self.nowPlayingWidth)
-                VStack(spacing: IslandDesign.gap) {
-                    Button { shell.dispatch?(.show(.agents)) } label: {
-                        HomeAgentSummary(registry: shell.agents, shell: shell)
-                    }.buttonStyle(HomeTileStyle())
-                    Button { shell.dispatch?(.show(.files)) } label: {
-                        shell.fileSummaryView.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    }.buttonStyle(HomeTileStyle())
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label).islandLabel().lineLimit(1)
+                Text(value).islandHero().contentTransition(.numericText())
+                if let detail {
+                    Text(detail).font(IslandDesign.caption).foregroundStyle(detailColor).lineLimit(1)
                 }
-            }.fixedSize(horizontal: false, vertical: true)
-            UsageSection(shell: shell)
-        }.frame(width: IslandDesign.contentWidth)
+            }
+            .frame(minWidth: Self.width, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityElement(children: .combine)
     }
+}
 
-    private var nowPlaying: some View {
+private struct HomeAgentsMetric: View {
+    @ObservedObject var registry: AgentRegistry
+    @ObservedObject var shell: IslandShell
+
+    var body: some View {
+        let pending = shell.state.pendingCount
+        HomeMetric(label: shell.text("agents"), value: "\(registry.agents.count)",
+                   detail: pending > 0 ? "\(shell.text("pending")): \(pending)" : nil,
+                   detailColor: IslandDesign.warning) {
+            shell.dispatch?(.show(.agents))
+        }
+    }
+}
+
+private struct HomeFilesMetric: View {
+    @ObservedObject var access: NativeFileAccess
+    @ObservedObject var shell: IslandShell
+
+    var body: some View {
+        HomeMetric(label: shell.text("files"), value: "\(access.items.count)") {
+            shell.dispatch?(.show(.files))
+        }
+    }
+}
+
+/// Now Playing as a music Live Activity: artwork, title, transport, then a scrubber with times.
+private struct NowPlayingActivity: View {
+    @ObservedObject var shell: IslandShell
+    @ObservedObject var spotify: SpotifyStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let artworkSize: CGFloat = 52
+
+    var body: some View {
+        let snapshot = spotify.snapshot
         VStack(alignment: .leading, spacing: 12) {
-            Button { shell.dispatch?(.show(.music)) } label: {
-                HStack(spacing: 12) {
-                    SpotifyArtwork(url: spotify.snapshot.artworkURL, size: Self.artworkSize)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(spotify.snapshot.title ?? shell.text("music")).font(IslandDesign.largeTitle).lineLimit(1)
-                        Text(spotify.snapshot.artist ?? musicStatus)
-                            .font(IslandDesign.callout).foregroundStyle(IslandDesign.secondary).lineLimit(2)
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                }.contentShape(Rectangle())
-            }.buttonStyle(.plain)
-            Spacer(minLength: 0)
-            nowPlayingFooter
-        }.islandCard()
+            HStack(spacing: 12) {
+                Button { shell.dispatch?(.show(.music)) } label: {
+                    HStack(spacing: 12) {
+                        SpotifyArtwork(url: snapshot.artworkURL, size: Self.artworkSize)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(snapshot.title ?? shell.text("music")).font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                            Text(snapshot.artist ?? status).font(IslandDesign.body).foregroundStyle(IslandDesign.secondary).lineLimit(1)
+                        }
+                    }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                }.buttonStyle(PressableStyle())
+                trailing
+            }
+            if let position = snapshot.position, let duration = snapshot.duration, duration > 0 {
+                scrubber(position: position, duration: duration)
+            }
+        }
     }
 
-    private var nowPlayingFooter: some View {
-        HStack(spacing: 6) {
-            Image(systemName: spotify.snapshot.playback == .playing ? "waveform" : "music.note")
-                .font(.system(size: 10, weight: .semibold)).foregroundStyle(IslandTint.music)
-            Text("Spotify").font(IslandDesign.caption.weight(.medium)).foregroundStyle(IslandDesign.secondary)
-            Spacer()
-            switch spotify.snapshot.availability {
-            case .available:
-                SpotifyTransportControls(shell: shell, spotify: spotify, compact: true)
-            case .requiresConsent:
-                Button(shell.text("spotifyConnect")) { Task { await spotify.connect() } }
-                    .buttonStyle(IslandPillButtonStyle(emphasis: .filled, tint: IslandDesign.success))
-            case .error:
-                Button(shell.text("spotifyRetry")) { Task { await spotify.refresh() } }
-                    .buttonStyle(IslandPillButtonStyle(emphasis: .tinted, tint: IslandDesign.warning))
-            case .unavailable, .denied:
-                EmptyView()
-            }
-        }.frame(height: 30)
-            .overlay(alignment: .bottomLeading) {
-                if spotify.commandError != nil {
-                    Text(shell.text("spotifyCommandFailed")).font(IslandDesign.footnote).foregroundStyle(.orange).offset(y: 14)
-                }
-            }
+    @ViewBuilder private var trailing: some View {
+        switch spotify.snapshot.availability {
+        case .available:
+            SpotifyTransportControls(shell: shell, spotify: spotify, compact: true)
+        case .requiresConsent:
+            Button(shell.text("spotifyConnect")) { Task { await spotify.connect() } }
+                .buttonStyle(IslandPillButtonStyle(emphasis: .filled, tint: IslandDesign.success))
+        case .error:
+            Button(shell.text("spotifyRetry")) { Task { await spotify.refresh() } }
+                .buttonStyle(IslandPillButtonStyle())
+        case .unavailable, .denied:
+            EmptyView()
+        }
     }
 
-    private var musicStatus: String {
+    private func scrubber(position: TimeInterval, duration: TimeInterval) -> some View {
+        let progress = min(1, max(0, position / duration))
+        return HStack(spacing: 10) {
+            Text(Self.clock(position)).font(IslandDesign.caption).monospacedDigit().foregroundStyle(IslandDesign.secondary)
+            GeometryReader { geometry in
+                Capsule().fill(IslandDesign.fill)
+                    .overlay(alignment: .leading) {
+                        Capsule().fill(IslandDesign.primary).frame(width: geometry.size.width * progress)
+                    }
+            }.frame(height: 4).accessibilityHidden(true)
+            Text("-" + Self.clock(duration - position)).font(IslandDesign.caption).monospacedDigit().foregroundStyle(IslandDesign.secondary)
+        }
+        .animation(reduceMotion ? nil : .linear(duration: 0.5), value: progress)
+    }
+
+    private var status: String {
         switch spotify.snapshot.availability {
         case .unavailable: shell.text("spotifyNotRunning")
         case .requiresConsent: shell.text("spotifyNeedsConsent")
@@ -78,49 +142,9 @@ struct HomeView: View {
         case .error: shell.text("spotifyReadFailed")
         }
     }
-}
 
-/// A tappable Home module: a platter that brightens on hover.
-private struct HomeTileStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View { Tile(configuration: configuration) }
-
-    private struct Tile: View {
-        let configuration: ButtonStyleConfiguration
-        @PromptState private var hovering = false
-
-        var body: some View {
-            configuration.label
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(IslandDesign.cardPadding)
-                .background(hovering ? IslandDesign.cardHover : IslandDesign.card,
-                            in: RoundedRectangle(cornerRadius: IslandDesign.cardRadius, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: IslandDesign.cardRadius, style: .continuous))
-                .scaleEffect(configuration.isPressed ? 0.98 : 1)
-                .onHover { hovering = $0 }
-                .animation(.easeOut(duration: 0.12), value: hovering)
-                .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-        }
-    }
-}
-
-private struct HomeAgentSummary: View {
-    @ObservedObject var registry: AgentRegistry
-    @ObservedObject var shell: IslandShell
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 10) {
-                IslandGlyph(symbol: "square.3.layers.3d", tint: IslandTint.neutral)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(shell.text("agents")).font(IslandDesign.title)
-                    Text(registry.agents.isEmpty ? shell.text("noAgentSessions") : "\(registry.agents.count) \(shell.text("agents"))")
-                        .font(IslandDesign.caption).foregroundStyle(IslandDesign.secondary).lineLimit(2)
-                }
-                Spacer(minLength: 0)
-                if !registry.agents.isEmpty {
-                    Text("\(registry.agents.count)").font(IslandDesign.display).foregroundStyle(IslandDesign.primary).monospacedDigit()
-                }
-            }
-        }
+    static func clock(_ seconds: TimeInterval) -> String {
+        let total = Int(max(0, seconds).rounded())
+        return String(format: "%d:%02d", total / 60, total % 60)
     }
 }

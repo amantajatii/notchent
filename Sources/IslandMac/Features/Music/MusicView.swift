@@ -5,61 +5,50 @@ import IslandCore
 struct MusicView: View {
     @ObservedObject var shell: IslandShell
     @ObservedObject var spotify: SpotifyStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(spacing: IslandDesign.gap) {
-            if spotify.snapshot.availability == .available { nowPlaying } else { unavailable }
-            if spotify.commandError != nil {
-                Text(shell.text("spotifyCommandFailed")).font(IslandDesign.caption).foregroundStyle(.orange)
-            }
-        }.frame(width: IslandDesign.contentWidth, alignment: .leading)
-    }
-
-    private var nowPlaying: some View {
-        VStack(spacing: IslandDesign.gap) {
-            HStack(spacing: 14) {
-                SpotifyArtwork(url: spotify.snapshot.artworkURL, size: 64)
-                    .shadow(color: .black.opacity(0.45), radius: 8, y: 3)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(spotify.snapshot.title ?? shell.text("music"))
-                        .font(IslandDesign.largeTitle).lineLimit(1).contentTransition(.opacity)
-                    if let artist = spotify.snapshot.artist {
-                        Text(artist).font(IslandDesign.callout).foregroundStyle(IslandDesign.secondary).lineLimit(1)
-                    }
-                    if spotify.snapshot.playback == .stopped {
-                        Text(status).font(IslandDesign.caption).foregroundStyle(IslandDesign.tertiary).lineLimit(1)
-                    }
-                }.frame(maxWidth: .infinity, alignment: .leading)
-                if spotify.snapshot.playback == .playing {
-                    Image(systemName: "waveform").font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(IslandTint.music)
-                        .symbolEffect(.variableColor.iterative, isActive: !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
-                        .accessibilityHidden(true)
+        let snapshot = spotify.snapshot
+        VStack(spacing: 16) {
+            header(snapshot)
+            if snapshot.availability == .available {
+                if let position = snapshot.position, let duration = snapshot.duration,
+                   position.isFinite, duration.isFinite, duration > 0 {
+                    SpotifyProgressLine(position: position, duration: duration / 1000)
                 }
-                SpotifyTransportControls(shell: shell, spotify: spotify)
+                SpotifyTransportControls(shell: shell, spotify: spotify).frame(maxWidth: .infinity)
             }
-            if let position = spotify.snapshot.position, let duration = spotify.snapshot.duration,
-               position.isFinite, duration.isFinite, duration > 0 {
-                SpotifyProgressLine(position: position, duration: duration / 1000)
+            if spotify.commandError != nil {
+                Text(shell.text("spotifyCommandFailed")).font(IslandDesign.caption).foregroundStyle(IslandDesign.warning)
             }
-        }.islandCard()
+        }
+        .padding(.horizontal, 4)
+        .frame(width: IslandDesign.contentWidth, alignment: .leading)
+        .animation(reduceMotion ? nil : IslandDesign.spring, value: snapshot.availability)
     }
 
-    private var unavailable: some View {
+    private func header(_ snapshot: SpotifySnapshot) -> some View {
         HStack(spacing: 14) {
-            SpotifyArtwork(url: nil, size: 48)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(spotify.snapshot.title ?? shell.text("music")).font(IslandDesign.largeTitle).lineLimit(1)
-                Text(status).font(IslandDesign.callout).foregroundStyle(IslandDesign.secondary).lineLimit(2)
+            SpotifyArtwork(url: snapshot.artworkURL, size: 64)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(snapshot.title ?? shell.text("music")).font(IslandDesign.largeTitle).lineLimit(1)
+                    .contentTransition(.opacity)
+                Text(snapshot.artist ?? status).font(IslandDesign.body).foregroundStyle(IslandDesign.secondary).lineLimit(2)
             }.frame(maxWidth: .infinity, alignment: .leading)
-            if spotify.snapshot.availability == .requiresConsent {
+            if snapshot.availability == .available, snapshot.playback == .playing {
+                Image(systemName: "waveform").font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(IslandDesign.primary)
+                    .symbolEffect(.variableColor.iterative, isActive: !reduceMotion)
+                    .accessibilityHidden(true)
+            }
+            if snapshot.availability == .requiresConsent {
                 Button(shell.text("spotifyConnect")) { Task { await spotify.connect() } }
                     .buttonStyle(IslandPillButtonStyle(emphasis: .filled, tint: spotifyGreen))
-            } else if spotify.snapshot.availability == .error {
+            } else if snapshot.availability == .error {
                 Button(shell.text("spotifyRetry")) { Task { await spotify.refresh() } }
-                    .buttonStyle(IslandPillButtonStyle(emphasis: .tinted, tint: IslandDesign.warning))
+                    .buttonStyle(IslandPillButtonStyle())
             }
-        }.islandCard()
+        }
     }
 
     private var status: String {
@@ -78,20 +67,23 @@ private let spotifyGreen = Color(red: 0.12, green: 0.84, blue: 0.38)
 private struct SpotifyProgressLine: View {
     let position: Double
     let duration: Double
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
+        let progress = min(1, max(0, position / duration))
         HStack(spacing: 10) {
             Text(time(position))
             GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(IslandDesign.fill)
-                    Capsule().fill(IslandDesign.primary)
-                        .frame(width: geometry.size.width * min(1, max(0, position / duration)))
-                }
-            }.frame(height: 3)
+                Capsule().fill(IslandDesign.fill)
+                    .overlay(alignment: .leading) {
+                        Capsule().fill(IslandDesign.primary).frame(width: geometry.size.width * progress)
+                    }
+            }.frame(height: 4)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(time(position)) / \(time(duration))")
-            Text("−" + time(max(0, duration - position)))
-        }.font(.system(size: 10, weight: .medium, design: .rounded)).monospacedDigit().foregroundStyle(IslandDesign.secondary)
+            Text("-" + time(max(0, duration - position)))
+        }
+        .font(IslandDesign.caption).monospacedDigit().foregroundStyle(IslandDesign.secondary)
+        .animation(reduceMotion ? nil : .linear(duration: 0.5), value: progress)
     }
     private func time(_ value: Double) -> String {
         let seconds = Int(min(36_000_000, max(0, value)))
@@ -99,25 +91,28 @@ private struct SpotifyProgressLine: View {
     }
 }
 
+/// Glyph-only transport, like the Live Activity: no circles, white symbols, press-down feedback.
 struct SpotifyTransportControls: View {
     @ObservedObject var shell: IslandShell
     @ObservedObject var spotify: SpotifyStore
     var compact = false
     var body: some View {
-        HStack(spacing: compact ? 6 : 10) {
-            control("backward.fill", command: .previous, label: shell.text("spotifyPrevious"))
+        HStack(spacing: compact ? 6 : 36) {
+            control("backward.fill", command: .previous, label: shell.text("spotifyPrevious"), size: compact ? 13 : 22)
             control(spotify.snapshot.playback == .playing ? "pause.fill" : "play.fill", command: .toggle,
-                    label: shell.text(spotify.snapshot.playback == .playing ? "spotifyPause" : "spotifyPlay"), primary: true)
-            control("forward.fill", command: .next, label: shell.text("spotifyNext"))
+                    label: shell.text(spotify.snapshot.playback == .playing ? "spotifyPause" : "spotifyPlay"),
+                    size: compact ? 17 : 30)
+            control("forward.fill", command: .next, label: shell.text("spotifyNext"), size: compact ? 13 : 22)
         }
     }
-    private func control(_ symbol: String, command: SpotifyCommand, label: String, primary: Bool = false) -> some View {
-        let base: CGFloat = compact ? 26 : 30
-        return Button { Task { await spotify.perform(command) } } label: {
-            Image(systemName: symbol)
+    private func control(_ symbol: String, command: SpotifyCommand, label: String, size: CGFloat) -> some View {
+        Button { Task { await spotify.perform(command) } } label: {
+            Image(systemName: symbol).font(.system(size: size, weight: .semibold))
+                .foregroundStyle(IslandDesign.primary)
+                .frame(width: max(size + 12, 30), height: max(size + 12, 30))
+                .contentShape(Rectangle())
         }
-        .buttonStyle(IslandIconButtonStyle(size: primary ? base + (compact ? 6 : 14) : base,
-                                           emphasis: primary ? .tinted : .plain, tint: IslandTint.music))
+        .buttonStyle(PressableStyle())
         .accessibilityLabel(label).help(label)
     }
 }
@@ -129,10 +124,10 @@ struct SpotifyArtwork: View {
     var body: some View {
         Group {
             if let image = loader.image { Image(nsImage: image).resizable().scaledToFill() }
-            else { Image(systemName: "music.note").font(.system(size: max(14, size * 0.4), weight: .semibold)).foregroundStyle(IslandTint.music) }
+            else { Image(systemName: "music.note").font(.system(size: max(14, size * 0.4), weight: .semibold)).foregroundStyle(IslandDesign.secondary) }
         }
-        .frame(width: size, height: size).background(IslandTint.music.opacity(0.16))
-        .clipShape(RoundedRectangle(cornerRadius: max(6, size * 0.16), style: .continuous))
+        .frame(width: size, height: size).background(IslandDesign.fill)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
         .contentTransition(.opacity)
         .task(id: url) { await loader.load(url) }
     }

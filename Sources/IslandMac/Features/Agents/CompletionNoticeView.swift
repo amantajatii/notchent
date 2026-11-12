@@ -12,7 +12,7 @@ struct CompletionNoticeView: View {
             HStack(spacing: 10) {
                 IslandGlyph(symbol: "checkmark", tint: IslandDesign.success, size: 28)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(shell.text("agentFinished")).font(Font.system(size: 12, weight: .semibold))
+                    Text(shell.text("agentFinished")).font(.system(size: 13, weight: .semibold))
                     Text(registry.completion?.sourceLabel?.components(separatedBy: "\n").first ?? "Codex")
                         .font(IslandDesign.footnote).foregroundStyle(IslandDesign.secondary).lineLimit(1)
                 }
