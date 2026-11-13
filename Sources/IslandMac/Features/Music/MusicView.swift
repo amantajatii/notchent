@@ -12,9 +12,8 @@ struct MusicView: View {
         VStack(spacing: 16) {
             header(snapshot)
             if snapshot.availability == .available {
-                if let position = snapshot.position, let duration = snapshot.duration,
-                   position.isFinite, duration.isFinite, duration > 0 {
-                    SpotifyProgressLine(position: position, duration: duration / 1000)
+                if let progress = snapshot.progress {
+                    SpotifyProgressLine(playback: progress)
                 }
                 SpotifyTransportControls(shell: shell, spotify: spotify).frame(maxWidth: .infinity)
             }
@@ -65,13 +64,12 @@ struct MusicView: View {
 private let spotifyGreen = Color(red: 0.12, green: 0.84, blue: 0.38)
 
 private struct SpotifyProgressLine: View {
-    let position: Double
-    let duration: Double
+    let playback: SpotifyProgress
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
-        let progress = min(1, max(0, position / duration))
+        let progress = playback.fraction
         HStack(spacing: 10) {
-            Text(time(position))
+            Text(time(playback.elapsed))
             GeometryReader { geometry in
                 Capsule().fill(IslandDesign.fill)
                     .overlay(alignment: .leading) {
@@ -79,8 +77,8 @@ private struct SpotifyProgressLine: View {
                     }
             }.frame(height: 4)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(time(position)) / \(time(duration))")
-            Text("-" + time(max(0, duration - position)))
+                .accessibilityLabel("\(time(playback.elapsed)) / \(time(playback.duration))")
+            Text("-" + time(playback.remaining))
         }
         .font(IslandDesign.caption).monospacedDigit().foregroundStyle(IslandDesign.secondary)
         .animation(reduceMotion ? nil : .linear(duration: 0.5), value: progress)

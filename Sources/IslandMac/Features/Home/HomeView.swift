@@ -97,8 +97,8 @@ private struct NowPlayingActivity: View {
                 }.buttonStyle(PressableStyle())
                 trailing
             }
-            if let position = snapshot.position, let duration = snapshot.duration, duration > 0 {
-                scrubber(position: position, duration: duration)
+            if let progress = snapshot.progress {
+                scrubber(progress)
             }
         }
     }
@@ -118,17 +118,17 @@ private struct NowPlayingActivity: View {
         }
     }
 
-    private func scrubber(position: TimeInterval, duration: TimeInterval) -> some View {
-        let progress = min(1, max(0, position / duration))
+    private func scrubber(_ playback: SpotifyProgress) -> some View {
+        let progress = playback.fraction
         return HStack(spacing: 10) {
-            Text(Self.clock(position)).font(IslandDesign.caption).monospacedDigit().foregroundStyle(IslandDesign.secondary)
+            Text(Self.clock(playback.elapsed)).font(IslandDesign.caption).monospacedDigit().foregroundStyle(IslandDesign.secondary)
             GeometryReader { geometry in
                 Capsule().fill(IslandDesign.fill)
                     .overlay(alignment: .leading) {
                         Capsule().fill(IslandDesign.primary).frame(width: geometry.size.width * progress)
                     }
             }.frame(height: 4).accessibilityHidden(true)
-            Text("-" + Self.clock(duration - position)).font(IslandDesign.caption).monospacedDigit().foregroundStyle(IslandDesign.secondary)
+            Text("-" + Self.clock(playback.remaining)).font(IslandDesign.caption).monospacedDigit().foregroundStyle(IslandDesign.secondary)
         }
         .animation(reduceMotion ? nil : .linear(duration: 0.5), value: progress)
     }

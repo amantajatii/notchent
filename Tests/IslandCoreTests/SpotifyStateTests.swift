@@ -126,3 +126,33 @@ import Testing
         #expect(pending.count >= count)
     }
 }
+
+struct SpotifyProgressTests {
+    @Test func remainingTimeConvertsMillisecondDurationToSeconds() throws {
+        // Spotify reports position in seconds and track duration in milliseconds.
+        let snapshot = SpotifySnapshot(availability: .available, playback: .playing, position: 42, duration: 180_000)
+        let progress = try #require(snapshot.progress)
+        #expect(progress.elapsed == 42)
+        #expect(progress.duration == 180)
+        #expect(progress.remaining == 138)
+        #expect(abs(progress.fraction - 42.0 / 180.0) < 1e-9)
+    }
+
+    @Test func remainingTimeIsClampedAtZero() throws {
+        let past = try #require(SpotifySnapshot(availability: .available, position: 200, duration: 180_000).progress)
+        #expect(past.remaining == 0)
+        #expect(past.elapsed == 180)
+        #expect(past.fraction == 1)
+        let negative = try #require(SpotifySnapshot(availability: .available, position: -5, duration: 180_000).progress)
+        #expect(negative.elapsed == 0)
+        #expect(negative.remaining == 180)
+    }
+
+    @Test func progressIsHiddenWhenDurationIsUnknown() {
+        #expect(SpotifySnapshot(availability: .available, position: 10, duration: nil).progress == nil)
+        #expect(SpotifySnapshot(availability: .available, position: 10, duration: 0).progress == nil)
+        #expect(SpotifySnapshot(availability: .available, position: nil, duration: 180_000).progress == nil)
+        #expect(SpotifySnapshot(availability: .available, position: .nan, duration: 180_000).progress == nil)
+        #expect(SpotifySnapshot(availability: .available, position: 10, duration: .infinity).progress == nil)
+    }
+}

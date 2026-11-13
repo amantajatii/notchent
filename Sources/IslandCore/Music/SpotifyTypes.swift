@@ -12,7 +12,10 @@ public struct SpotifySnapshot: Sendable, Equatable {
     public var title: String?
     public var artist: String?
     public var artworkURL: URL?
+    /// Player position in seconds, as Spotify's `player position` reports it.
     public var position: TimeInterval?
+    /// Track length in milliseconds, as Spotify's `duration of current track` reports it.
+    /// Read it through `progress`, which converts to seconds.
     public var duration: TimeInterval?
 
     public init(availability: SpotifyAvailability, playback: SpotifyPlayback = .unknown, title: String? = nil,
@@ -24,6 +27,26 @@ public struct SpotifySnapshot: Sendable, Equatable {
         self.artworkURL = artworkURL
         self.position = position
         self.duration = duration
+    }
+}
+
+/// Elapsed and remaining playback time in seconds, ready for display.
+public struct SpotifyProgress: Sendable, Equatable {
+    public let elapsed: TimeInterval
+    public let duration: TimeInterval
+
+    public var remaining: TimeInterval { max(0, duration - elapsed) }
+    public var fraction: Double { elapsed / duration }
+}
+
+extension SpotifySnapshot {
+    private static let millisecondsPerSecond: TimeInterval = 1000
+
+    /// Normalised progress, or nil when the track length is unknown or invalid.
+    public var progress: SpotifyProgress? {
+        guard let position, let duration, position.isFinite, duration.isFinite, duration > 0 else { return nil }
+        let seconds = duration / Self.millisecondsPerSecond
+        return SpotifyProgress(elapsed: min(seconds, max(0, position)), duration: seconds)
     }
 }
 
