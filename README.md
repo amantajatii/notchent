@@ -58,10 +58,18 @@ For Terminal, choose a folder to create a shell session. **Hide** hides the pane
 
 ## Current agent support
 
+**Claude Code hooks (optional).** Install once to show Claude sessions as working / waiting / done and a "Task complete" card:
+
+```sh
+python3 scripts/install-claude-hooks.py --helper .build/apps/Notchent.app/Contents/MacOS/IslandHook
+```
+
+This adds `IslandHook claude-hook` to `SessionStart`, `UserPromptSubmit`, `Notification`, `PostToolUse`, `Stop` and `SessionEnd` in `~/.claude/settings.json` (with a backup), next to any existing hooks. The hook stores only the session id, project folder, state, times and a 300-character preview of the last reply in `~/Library/Application Support/IslandMac/Claude/` (owner-only), prints nothing, and always exits 0. Remove it with `--uninstall`. New Claude Code sessions pick the hooks up.
+
 | CLI | Executable detected | Discovery | Read questions / send answers |
 | --- | --- | --- | --- |
 | Codex CLI | `codex` | Candidate metadata | A single question with a text answer through the local daemon was verified in one controlled test; command approvals and other combinations remain unverified |
-| Claude Code | `claude` | Candidate metadata | Not implemented |
+| Claude Code | `claude`, or the native `~/.local/share/claude/versions/<version>` binary | Candidate metadata; with the optional hooks: state, project and "Task complete" with a reply preview | Not implemented |
 | Antigravity CLI | `agy` | Candidate metadata | Not implemented |
 | Oh My Pi | `omp` | Candidate metadata | Not implemented |
 

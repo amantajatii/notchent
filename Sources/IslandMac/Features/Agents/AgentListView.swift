@@ -70,7 +70,7 @@ struct AgentListView: View {
     }
 
     private func title(_ agent: DiscoveredAgent) -> String {
-        agent.sourceLabel?.components(separatedBy: "\n").first ?? "\(agent.kind == .codex ? "Codex" : agent.kind.rawValue) · PID \(agent.pid)"
+        agent.sourceLabel?.components(separatedBy: "\n").first ?? "\(agent.kind.displayName) · PID \(agent.pid)"
     }
     private func project(_ agent: DiscoveredAgent) -> String? {
         if let source = agent.sourceLabel {
@@ -84,6 +84,7 @@ struct AgentListView: View {
     }
 
     private func isWaiting(_ agent: DiscoveredAgent) -> Bool {
+        if agent.activity == "sessionWaiting" { return true }
         guard let prompt = registry.prompt else { return false }
         return prompt.sessionID == agent.sessionID
     }
@@ -125,7 +126,7 @@ struct AgentListView: View {
     }
 
     private func metadata(_ agent: DiscoveredAgent) -> some View {
-        var parts = [(agent.kind == .codex ? "Codex" : agent.kind.rawValue) + " · " + host(agent)]
+        var parts = [agent.kind.displayName + " · " + host(agent)]
         if let project = project(agent) { parts.append(URL(fileURLWithPath: project).lastPathComponent) }
         return Text(parts.joined(separator: " · ")).font(IslandDesign.caption).foregroundStyle(IslandDesign.secondary)
             .lineLimit(1).help(project(agent) ?? "").textSelection(.enabled)

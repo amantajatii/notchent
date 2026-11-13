@@ -55,15 +55,17 @@ struct NativeAgentAdapter: AgentAdapter {
                 let records = await Task.detached { HostSessionDiscovery.snapshot() }.value
                 let found = HostSessionDiscovery.discover(records: records, owned: owned)
                 let observed = await Task.detached { CodexSessionObserver.scan(records: records) }.value
-                let local = found.filter { $0.ownedTerminal != nil || $0.host != nil }
-                unmappedCount = found.count - local.count
+                let claudeRecords = await Task.detached { ClaudeSessionStore().load() }.value
+                let claude = ClaudeSessionObserver.merge(found: found, records: claudeRecords)
+                let local = found.filter { $0.kind != .claudeCode && ($0.ownedTerminal != nil || $0.host != nil) }
+                unmappedCount = found.count - local.count - claude.count
                 await codex.refresh(records: records)
                 codexConnected = await codex.isConnected
                 chatRevisions = await codex.chatRevisions
                 let monitored = await codex.monitoredAgents
                 let monitoredIDs = Set(monitored.compactMap { $0.sessionID?.terminalSessionKey })
                 let observedPIDs = Set(observed.map(\.pid))
-                agents = local.filter { !observedPIDs.contains($0.pid) && $0.host != .codexDesktop } + observed.filter { !monitoredIDs.contains($0.sessionID?.terminalSessionKey ?? "") } + monitored
+                agents = local.filter { !observedPIDs.contains($0.pid) && $0.host != .codexDesktop } + claude + observed.filter { !monitoredIDs.contains($0.sessionID?.terminalSessionKey ?? "") } + monitored
                 if let finished = completions.update(agents).max(by: { ($0.completedAt ?? .distantPast) < ($1.completedAt ?? .distantPast) }) {
                     completion = finished
                     completionChanged?()

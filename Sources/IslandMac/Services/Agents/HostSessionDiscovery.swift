@@ -99,9 +99,9 @@ struct HostSessionDiscovery {
         }
     }
     static func kind(for path: String) -> AgentKind? {
-        switch URL(fileURLWithPath: path).lastPathComponent {
+        if ClaudeExecutable.matches(path) { return .claudeCode }
+        return switch URL(fileURLWithPath: path).lastPathComponent {
         case "codex": .codex
-        case "claude": .claudeCode
         case "agy": .antigravity
         case "omp": .ohMyPi
         default: nil // Script agents running as node cannot be attributed without additional public proof.

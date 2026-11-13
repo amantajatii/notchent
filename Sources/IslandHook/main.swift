@@ -68,8 +68,37 @@ func runClaudeStatusLine() -> Data {
     return Data(ClaudeStatusLine.text(statusLineInput: input, record: fresh ?? relay.read()?.current(at: Date())).utf8)
 }
 
-let output = CommandLine.arguments.dropFirst().first == "claude-statusline"
-    ? runClaudeStatusLine()
-    : (try? run()) ?? Data("{}".utf8)
-FileHandle.standardOutput.write(output)
-FileHandle.standardOutput.write(Data([10]))
+/// The nearest Claude Code ancestor (hooks may run through a shell), with its birth time.
+func claudeProcess() -> (pid: Int32, birth: UInt64)? {
+    var pid = getppid()
+    for _ in 0..<8 where pid > 1 {
+        var path = [CChar](repeating: 0, count: 4096)
+        var info = proc_bsdinfo()
+        let size = Int32(MemoryLayout<proc_bsdinfo>.stride)
+        guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size else { return nil }
+        if proc_pidpath(pid, &path, UInt32(path.count)) > 0, ClaudeExecutable.matches(String(cString: path)) {
+            return (pid, info.pbi_start_tvsec * 1_000_000 + info.pbi_start_tvusec)
+        }
+        pid = Int32(info.pbi_ppid)
+    }
+    return nil
+}
+
+/// Claude Code hook: record session state for the island. Prints nothing and always succeeds,
+/// so it can never block or alter Claude Code (stdout of some hooks becomes model context).
+func runClaudeHook() {
+    let input = readInput()
+    guard input.count <= ClaudeSessionStore.maximumInputBytes else { return }
+    try? ClaudeSessionStore().apply(payload: input, process: claudeProcess())
+}
+
+switch CommandLine.arguments.dropFirst().first {
+case "claude-hook":
+    runClaudeHook()
+case "claude-statusline":
+    FileHandle.standardOutput.write(runClaudeStatusLine())
+    FileHandle.standardOutput.write(Data([10]))
+default:
+    FileHandle.standardOutput.write((try? run()) ?? Data("{}".utf8))
+    FileHandle.standardOutput.write(Data([10]))
+}
