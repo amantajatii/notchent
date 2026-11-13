@@ -11,6 +11,8 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 6) {
             caption("settingsGeneral", fallback: "General")
             generalSection
+            caption("settingsAppearance", fallback: "Appearance").padding(.top, 10)
+            appearanceSection
             caption("settingsPanel", fallback: "Panel").padding(.top, 10)
             panelSection
             Text(shell.text("files")).islandLabel().padding(.leading, IslandDesign.cardPadding).padding(.top, 10)
@@ -67,6 +69,18 @@ struct SettingsView: View {
         if launchAtLogin.failed { return shell.text("loginRegistrationError") }
         if launchAtLogin.status == .requiresApproval { return shell.text("loginApprovalRequired") }
         return nil
+    }
+
+    private var appearanceSection: some View {
+        IslandFormSection {
+            settingsRow(shell.text("pillVisibility"), symbol: "capsule.fill", tint: .gray, subtitle: shell.text("pillVisibilityHint")) {
+                Picker(shell.text("pillVisibility"), selection: $shell.settings.pillVisibility) {
+                    Text(shell.text("pillAutomatic")).tag(PillVisibility.automatic)
+                    Text(shell.text("pillAlways")).tag(PillVisibility.always)
+                    Text(shell.text("pillHover")).tag(PillVisibility.hover)
+                }.labelsHidden().frame(width: controlWidth)
+            }
+        }
     }
 
     private var panelSection: some View {

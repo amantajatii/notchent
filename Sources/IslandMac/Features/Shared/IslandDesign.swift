@@ -51,6 +51,12 @@ enum IslandDesign {
 
     // Motion: critically damped by default (Apple ships damping 1.0, response ~0.35 for UI moves).
     static let spring = Animation.spring(response: 0.35, dampingFraction: 1)
+    /// The island shape itself springs with a hint of overshoot, like the Dynamic Island.
+    static let shapeResponse = 0.42
+    static let shapeDamping = 0.78
+
+    /// Transparent room around the surface so the spring's overshoot is never clipped.
+    static let windowMargin: CGFloat = 16
 }
 
 extension View {
@@ -86,7 +92,6 @@ enum IslandTint {
         case .music: music
         case .files: files
         case .terminal: terminal
-        case .settings: settings
         }
     }
 }

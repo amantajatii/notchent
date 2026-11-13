@@ -1,6 +1,6 @@
 import CoreGraphics
 
-public enum IslandFeature: String, CaseIterable, Sendable { case home, agents, music, files, terminal, settings }
+public enum IslandFeature: String, CaseIterable, Sendable { case home, agents, music, files, terminal }
 public enum IslandMode: Equatable, Sendable { case hidden, mini, home, feature(IslandFeature), prompt, drop, completion }
 public enum IslandTimer: Equatable, Sendable { case open, close }
 public enum IslandEffect: Equatable, Sendable { case schedule(IslandTimer, token: UInt64, milliseconds: Int), cancelTimer }
@@ -8,6 +8,8 @@ public enum IslandEvent: Sendable {
     case pointerEntered, pointerExited, timer(IslandTimer, token: UInt64), show(IslandFeature), reveal(IslandFeature), hide
     case agentCompleted, filesDropped, shelfDragEnded
     case inputChanged(Bool), dragChanged(Bool), pendingChanged(Int), fullScreenChanged(Bool), openPrompt, closePrompt
+    /// Whether the pill stays visible while nothing is open (settings plus the current screen).
+    case pillAtRestChanged(Bool)
 }
 public struct IslandState: Equatable, Sendable {
     public var showsPromptBanner: Bool { pendingCount > 0 && mode == .feature(.terminal) && !fullScreen }
@@ -23,6 +25,9 @@ public struct IslandState: Equatable, Sendable {
     public var scheduledTransition: IslandTimer?
     public var generation: UInt64 = 0
     public var settings = IslandSettings()
+    /// The pill stays on screen at rest; then the resting mode is `.mini` instead of `.hidden`.
+    public var pillAtRest = false
+    public var restMode: IslandMode { pillAtRest ? .mini : .hidden }
     public init() {}
 }
 public enum IslandReducer {
@@ -40,7 +45,7 @@ public enum IslandReducer {
     private static func closeIfOutside(_ s: inout IslandState) -> [IslandEffect] {
         if s.filesPinned { return cancel(&s) }
         if s.mode == .prompt && s.pendingCount > 0 { return cancel(&s) }
-        guard s.mode != .hidden, !s.pointerInside, !s.inputActive, !s.dragActive else { return cancel(&s) }
+        guard s.mode != s.restMode, !s.pointerInside, !s.inputActive, !s.dragActive else { return cancel(&s) }
         return schedule(.close, &s)
     }
     @discardableResult public static func reduce(state s: inout IslandState, event: IslandEvent) -> [IslandEffect] {
@@ -49,7 +54,7 @@ public enum IslandReducer {
             guard token == s.generation, s.scheduledTransition == timer else { return [] }
             s.scheduledTransition = nil
             if timer == .open, s.pointerInside, !s.dragActive, s.mode == .hidden { s.mode = .mini }
-            if timer == .close, !s.pointerInside, !s.inputActive, !s.dragActive { s.mode = .hidden }
+            if timer == .close, !s.pointerInside, !s.inputActive, !s.dragActive { s.mode = s.restMode }
         case .pointerEntered:
             s.pointerInside = true
             return s.mode == .hidden ? schedule(.open, &s) : cancel(&s)
@@ -66,25 +71,25 @@ public enum IslandReducer {
             }
             return closeIfOutside(&s)
         case .agentCompleted:
-            guard (s.mode == .hidden || s.mode == .completion), !s.inputActive, !s.dragActive,
+            guard (s.mode == s.restMode || s.mode == .completion), !s.inputActive, !s.dragActive,
                   s.pendingCount == 0, !s.pointerInside,
                   !s.fullScreen || s.settings.fullScreenPrompts == .automatic else { return [] }
             s.mode = .completion
             s.generation &+= 1; s.scheduledTransition = .close
             return [.schedule(.close, token: s.generation, milliseconds: 5000)]
         case .hide:
-            if !s.inputActive && !s.dragActive { s.filesPinned = false; s.mode = .hidden; return cancel(&s) }
+            if !s.inputActive && !s.dragActive { s.filesPinned = false; s.mode = s.restMode; return cancel(&s) }
         case .filesDropped:
             s.filesPinned = true; s.dragActive = false; s.mode = .feature(.files)
             return cancel(&s)
         case .shelfDragEnded:
-            if s.filesPinned { s.filesPinned = false; s.mode = .hidden; return cancel(&s) }
+            if s.filesPinned { s.filesPinned = false; s.mode = s.restMode; return cancel(&s) }
         case let .inputChanged(active):
             s.inputActive = active
             return active ? cancel(&s) : closeIfOutside(&s)
         case let .dragChanged(active):
             if active { s.filesPinned = false }
-            s.dragActive = active; s.mode = active ? .drop : .hidden
+            s.dragActive = active; s.mode = active ? .drop : s.restMode
             return cancel(&s)
         case let .pendingChanged(count):
             let previous = s.pendingCount
@@ -93,12 +98,18 @@ public enum IslandReducer {
                 s.mode = .prompt
                 return closeIfOutside(&s)
             }
-            if count == 0 && s.mode == .prompt { s.mode = s.promptReturnMode ?? .hidden; s.promptReturnMode = nil; return cancel(&s) }
+            if count == 0 && s.mode == .prompt { s.mode = s.promptReturnMode ?? s.restMode; s.promptReturnMode = nil; return cancel(&s) }
             // Count-only updates must not alter an existing hover deadline.
         case let .fullScreenChanged(active): s.fullScreen = active
+        case let .pillAtRestChanged(atRest):
+            guard atRest != s.pillAtRest else { return [] }
+            let wasResting = s.mode == s.restMode
+            s.pillAtRest = atRest
+            if wasResting { s.mode = s.restMode; return cancel(&s) }
+            return closeIfOutside(&s)
         case .closePrompt:
             guard s.mode == .prompt else { return [] }
-            s.mode = s.promptReturnMode ?? .hidden; s.promptReturnMode = nil
+            s.mode = s.promptReturnMode ?? s.restMode; s.promptReturnMode = nil
             return closeIfOutside(&s)
         case .openPrompt:
             if s.pendingCount > 0 && !s.dragActive { if s.mode != .prompt { s.promptReturnMode = s.mode }; s.mode = .prompt; return closeIfOutside(&s) }

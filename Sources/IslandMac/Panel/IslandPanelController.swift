@@ -124,6 +124,7 @@ import QuartzCore
             activeScreen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) }
         }
         guard let screen else { return }
+        updatePillAtRest(screen)
         let focusedTerminal = panel.isKeyWindow && ((shell.state.mode == .feature(.terminal) && panel.firstResponder is LocalProcessTerminalView) || ((shell.state.mode == .prompt || shell.state.mode == .feature(.agents)) && panel.firstResponder is NSTextView))
         if focusedTerminal != shell.state.inputActive { send(.inputChanged(focusedTerminal)) }
         let point = NSEvent.mouseLocation
@@ -138,6 +139,13 @@ import QuartzCore
         let next = hoveringDropArea
         if next != inside { inside = next; send(next ? .pointerEntered : .pointerExited) }
     }
+    /// The resting pill follows the setting and the screen's notch. Full-screen state is deliberately
+    /// ignored: without Screen Recording it reads as "full screen" all the time and would hide the pill.
+    private func updatePillAtRest(_ screen: NSScreen) {
+        let hasNotch = screen.auxiliaryTopLeftArea != nil
+        let atRest = shell.settings.pillVisibility.showsAtRest(screenHasNotch: hasNotch)
+        if atRest != shell.state.pillAtRest { send(.pillAtRestChanged(atRest)) }
+    }
     private func setDragHot(_ active: Bool) {
         guard dragHot != active else { return }
         dragHot = active
@@ -148,14 +156,16 @@ import QuartzCore
         guard visible else { closePanel(); return }
         if closing {
             motionGeneration &+= 1; displayLink?.invalidate(); displayLink = nil; motion = nil; closing = false
+            // The content had started fading out; bring it back for the same mode.
+            if shell.surface.reveal.hiding { shell.surface.reveal = ContentReveal(id: shell.surface.reveal.id &+ 1) }
         }
         shell.presentedMode = shell.state.mode
-        panel.inputEnabled = shell.state.mode == .prompt || shell.state.inputActive || shell.state.mode == .feature(.terminal) || shell.state.mode == .feature(.settings) || shell.state.mode == .feature(.agents)
+        panel.inputEnabled = shell.state.mode == .prompt || shell.state.inputActive || shell.state.mode == .feature(.terminal) || shell.state.mode == .feature(.agents)
         if !panel.isVisible, measuredMode != shell.presentedMode || measuredSize.width <= 1 || measuredSize.height <= 1, let screen {
             // A readable first viewport lets SwiftUI mount before its first size report.
             let initial = shell.presentedMode == .mini ? CGSize(width: miniIslandWidth(screen), height: miniIslandHeight(screen)) : shell.presentedMode == .hidden ? CGSize(width: 220, height: 44) : (shell.presentedMode == .completion ? CGSize(width: 320, height: 52) : (shell.presentedMode == .home ? CGSize(width: 560, height: 194) : CGSize(width: 700, height: 440)))
             targetFrame = PanelGeometry.panelRect(screen: screen.frame, size: initial)
-            panel.setFrame(targetFrame, display: false)
+            panel.setFrame(windowFrame(targetFrame), display: false)
             shell.surface.size = shell.presentedMode == .mini && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? CGSize(width: targetFrame.width, height: 0) : targetFrame.size
             shell.surface.opacity = shell.presentedMode == .mini ? 0 : 1
             panel.alphaValue = 1; panel.ignoresMouseEvents = true
@@ -184,7 +194,7 @@ import QuartzCore
         if reduceMotion { shell.surface.size = frame.size }
         panel.alphaValue = 1
         panel.orderFrontRegardless()
-        animate(to: frame.size, alpha: 1, duration: reduceMotion ? 0.1 : (opening ? 0.48 : 0.42), screen: screen, closingGeneration: nil)
+        animate(to: frame.size, alpha: 1, duration: reduceMotion ? 0.1 : Self.springDuration, screen: screen, closingGeneration: nil)
     }
 
     private func closePanel() {
@@ -194,19 +204,20 @@ import QuartzCore
         let generation = motionGeneration
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         guard let screen else { panel.orderOut(nil); closing = false; return }
+        shell.surface.reveal.hiding = true
         let closedSize = shell.presentedMode == .mini ? CGSize(width: shell.surface.size?.width ?? panel.frame.width, height: 0) : CGSize(width: 160, height: 0)
         if !reduceMotion { shell.surface.opacity = 1 }
         animate(to: reduceMotion ? shell.surface.size ?? panel.frame.size : closedSize, alpha: reduceMotion ? 0 : 1,
-                duration: reduceMotion ? 0.1 : 0.42, screen: screen, closingGeneration: generation)
+                duration: reduceMotion ? 0.1 : 0.34, screen: screen, closingGeneration: generation, delay: reduceMotion ? 0 : 0.08)
     }
 
-    private func animate(to size: CGSize, alpha: CGFloat, duration: TimeInterval, screen: NSScreen, closingGeneration: UInt64?) {
+    private func animate(to size: CGSize, alpha: CGFloat, duration: TimeInterval, screen: NSScreen, closingGeneration: UInt64?, delay: CFTimeInterval = 0) {
         displayLink?.invalidate()
         let from = shell.surface.size ?? panel.frame.size
-        panel.setFrame(PanelGeometry.transitionViewport(screen: screen.frame, from: from, to: size), display: true)
+        panel.setFrame(windowFrame(PanelGeometry.transitionViewport(screen: screen.frame, from: from, to: size)), display: true)
         updateMousePassThrough()
         motion = Motion(screen: screen.frame, from: from, to: size, alpha: CGFloat(shell.surface.opacity),
-                        targetAlpha: alpha, start: CACurrentMediaTime(), duration: duration, closingGeneration: closingGeneration)
+                        targetAlpha: alpha, start: CACurrentMediaTime() + delay, duration: duration, closingGeneration: closingGeneration)
         let link = screen.displayLink(target: self, selector: #selector(stepMotion(_:)))
         displayLink = link
         link.add(to: .main, forMode: .common)
@@ -214,19 +225,38 @@ import QuartzCore
 
     @objc private func stepMotion(_ link: CADisplayLink) {
         guard link === displayLink, let motion else { link.invalidate(); return }
-        let elapsed = min(1, max(0, (CACurrentMediaTime() - motion.start) / motion.duration))
-        let progress = 1 - pow(1 - elapsed, 3)
-        let visualFrame = PanelGeometry.transitionRect(screen: motion.screen, from: motion.from, to: motion.to, progress: progress)
-        shell.surface.size = visualFrame.size
-        shell.surface.opacity = Double(motion.alpha + (motion.targetAlpha - motion.alpha) * CGFloat(progress))
+        let seconds = max(0, CACurrentMediaTime() - motion.start)
+        let elapsed = min(1, seconds / motion.duration)
+        // Opening and resizing spring (slight overshoot); collapsing eases in without a bounce.
+        let springs = motion.closingGeneration == nil && motion.duration > 0.2
+        let progress = springs ? Self.springProgress(seconds) : (motion.closingGeneration == nil ? 1 - pow(1 - elapsed, 3) : elapsed * elapsed * (3 - 2 * elapsed))
+        shell.surface.size = CGSize(width: max(0, motion.from.width + (motion.to.width - motion.from.width) * progress),
+                                    height: max(0, motion.from.height + (motion.to.height - motion.from.height) * progress))
+        shell.surface.opacity = Double(motion.alpha + (motion.targetAlpha - motion.alpha) * CGFloat(min(1, elapsed * 2)))
         updateMousePassThrough()
         guard elapsed >= 1 else { return }
         link.invalidate(); displayLink = nil; self.motion = nil
+        shell.surface.size = motion.to
         if let generation = motion.closingGeneration, generation == motionGeneration {
             panel.orderOut(nil); shell.presentedMode = .hidden; closing = false
         } else {
-            panel.setFrame(PanelGeometry.panelRect(screen: motion.screen, size: motion.to), display: true)
+            panel.setFrame(windowFrame(PanelGeometry.panelRect(screen: motion.screen, size: motion.to)), display: true)
         }
+    }
+    /// Seconds a spring takes to settle within a fraction of a point.
+    private static let springDuration = 0.6
+    /// Damped spring step response: 0 at rest, 1 at target, a little overshoot in between.
+    static func springProgress(_ t: Double, response: Double = IslandDesign.shapeResponse, damping: Double = IslandDesign.shapeDamping) -> Double {
+        guard t < springDuration else { return 1 }
+        let omega = 2 * Double.pi / response
+        let damped = omega * (1 - damping * damping).squareRoot()
+        let envelope = exp(-damping * omega * t)
+        return 1 - envelope * (cos(damped * t) + damping * omega / damped * sin(damped * t))
+    }
+    /// The window is larger than the surface so the spring's overshoot is never clipped.
+    private func windowFrame(_ surface: CGRect) -> CGRect {
+        let margin = IslandDesign.windowMargin
+        return CGRect(x: surface.minX - margin, y: surface.minY - margin, width: surface.width + 2 * margin, height: surface.height + margin)
     }
     private func updateMousePassThrough() {
         panel.ignoresMouseEvents = !containsSurfacePoint(NSEvent.mouseLocation)
@@ -264,7 +294,7 @@ struct IslandRootView: View {
                 if mode == .hidden {
                     EmptyView()
                 } else if mode == .mini {
-                    MiniIslandView(shell: shell, spotify: shell.spotify)
+                    MiniIslandView(shell: shell, spotify: shell.spotify, artwork: shell.artwork)
                 } else if mode == .completion {
                     CompletionNoticeView(shell: shell, registry: shell.agents)
                 } else if mode == .drop {
@@ -273,7 +303,7 @@ struct IslandRootView: View {
                     PromptView(registry: shell.agents, shell: shell)
                 } else {
                     navigation
-                    content
+                    PageReveal(state: shell.surface) { content }
                 }
             }
             .buttonStyle(IslandControlStyle()).padding((mode == .hidden || mode == .mini) ? 0 : (mode == .completion ? 12 : 20))
@@ -291,82 +321,18 @@ struct IslandRootView: View {
         if case let .feature(feature) = shell.presentedMode { return feature }
         return .home
     }
-    private static let tabs: [IslandFeature] = [.home, .agents, .music, .files, .terminal]
-    private static let tabWidth: CGFloat = 74
-    private static let tabHeight: CGFloat = 28
-    private static let tabSpacing: CGFloat = 2
-    /// A segmented control, like the ones in Control Center and System Settings.
     private var navigation: some View {
-        HStack(spacing: 0) {
-            navigationButton(symbol: "gearshape.fill", key: "settings", selected: selectedFeature == .settings) {
-                shell.dispatch?(.show(.settings))
-            }
-            Spacer(minLength: 8)
-            tabStrip
-            Spacer(minLength: 8)
-            navigationButton(symbol: "chevron.up", key: "hide", selected: false) {
-                shell.dispatch?(.inputChanged(false))
-                shell.dispatch?(.hide)
-            }
-        }.frame(width: IslandDesign.contentWidth)
-    }
-    private var tabStrip: some View {
-        HStack(spacing: Self.tabSpacing) {
-            ForEach(Self.tabs, id: \.self) { feature in
-                let selected = selectedFeature == feature
-                Button { shell.dispatch?(.show(feature)) } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: symbol(for: feature)).font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(selected ? IslandDesign.primary : IslandDesign.secondary)
-                        Text(shell.text(feature.rawValue)).font(.system(size: 11, weight: selected ? .semibold : .medium)).lineLimit(1)
-                            .foregroundStyle(selected ? IslandDesign.primary : IslandDesign.secondary)
-                    }
-                    .frame(width: Self.tabWidth, height: Self.tabHeight)
-                    .contentShape(Capsule())
-                }.buttonStyle(.plain)
-                    .help(shell.text(feature.rawValue)).accessibilityLabel(shell.text(feature.rawValue))
-                    .accessibilityAddTraits(selected ? .isSelected : [])
-            }
-        }
-        .background {
-            let index = Self.tabs.firstIndex(of: selectedFeature)
-            let center = CGFloat(Self.tabs.count - 1) / 2
-            Capsule().fill(IslandDesign.fillStrong)
-                .frame(width: Self.tabWidth, height: Self.tabHeight)
-                .offset(x: (CGFloat(index ?? 0) - center) * (Self.tabWidth + Self.tabSpacing))
-                .opacity(index == nil ? 0 : 1)
-                .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .timingCurve(0.22, 1, 0.36, 1, duration: 0.42), value: index)
-                .allowsHitTesting(false)
-        }
-        .padding(3)
-        .background(Capsule().fill(IslandDesign.card))
-        .animation(.easeOut(duration: 0.2), value: selectedFeature)
-    }
-    private func navigationButton(symbol: String, key: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: symbol) }
-            .buttonStyle(IslandIconButtonStyle(emphasis: selected ? .filled : .plain, tint: .white))
-            .help(shell.text(key)).accessibilityLabel(shell.text(key))
-    }
-    private func symbol(for feature: IslandFeature) -> String {
-        switch feature {
-        case .home: "square.grid.2x2"
-        case .agents: "square.3.layers.3d"
-        case .music: "music.note"
-        case .files: "tray"
-        case .terminal: "terminal"
-        case .settings: "slider.horizontal.3"
-        }
+        IslandNavigation(selected: selectedFeature, title: { shell.text($0.rawValue) }) { shell.dispatch?(.show($0)) }
     }
     @ViewBuilder private var content: some View {
         let feature = selectedFeature
         if let native = shell.retainedNativeViews[feature] { RetainedNativeView(view: native) }
         else if let view = shell.featureViews[feature] { view }
-        else if feature == .settings { SettingsView(shell: shell, launchAtLogin: shell.launchAtLogin) }
         else if feature == .home { HomeView(shell: shell, spotify: shell.spotify) }
         else if feature == .music { MusicView(shell: shell, spotify: shell.spotify) }
         else {
             IslandEmptyState(title: shell.text(feature == .agents ? "agentsUnavailable" : feature == .files ? "filesUnavailable" : "terminalUnavailable"),
-                             symbol: symbol(for: feature))
+                             symbol: IslandNavigation.symbol(for: feature))
         }
     }
 }
@@ -403,32 +369,65 @@ private func miniIslandHeight(_ screen: NSScreen) -> CGFloat {
     max(24, screen.safeAreaInsets.top, NSStatusBar.system.thickness, screen.frame.maxY - screen.visibleFrame.maxY)
 }
 
+/// The resting pill. While a track plays it shows the cover, the title (where no camera notch hides it)
+/// and a level meter tinted with the cover's colour.
 private struct MiniIslandView: View {
     @ObservedObject var shell: IslandShell
     @ObservedObject var spotify: SpotifyStore
+    @ObservedObject var artwork: ArtworkPaletteStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private static let hoverGrowth: CGFloat = 6
+    /// Gap from the inner edge of the shoulders to the cover and the meter.
+    private static let edgePadding: CGFloat = 16
+    private static let itemSpacing: CGFloat = 8
     private var screen: NSScreen? { NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) ?? NSScreen.main }
+
     var body: some View {
+        let height = screen.map(miniIslandHeight) ?? 24
+        let hasNotch = screen?.auxiliaryTopLeftArea != nil
+        let playing = spotify.snapshot.playback == .playing
+        let showsTitle = playing && !hasNotch && spotify.snapshot.title != nil
+        let base = screen.map(miniIslandWidth) ?? 236
+        let grow = shell.state.pointerInside ? Self.hoverGrowth : 0
+        // Cover and meter share one slot size, so the title sits on the pill's true centre.
+        let slot = min(22, max(14, height - 8))
         Button { shell.dispatch?(.show(.home)) } label: {
-            HStack(spacing: 6) {
-                if spotify.snapshot.playback == .playing {
-                    SpotifyArtwork(url: spotify.snapshot.artworkURL, size: 14)
-                    Spacer(minLength: 0)
-                    TimelineView(.animation(minimumInterval: 0.25, paused: reduceMotion)) { context in
-                        let phase = Int(context.date.timeIntervalSinceReferenceDate * 4)
-                        HStack(alignment: .center, spacing: 2) {
-                            ForEach(0..<4) { index in
-                                Capsule().fill(.green).frame(width: 2, height: CGFloat(reduceMotion ? 8 : 4 + ((phase + index * 3) % 4) * 3))
-                            }
-                        }.frame(height: 16)
+            HStack(spacing: Self.itemSpacing) {
+                if playing {
+                    SpotifyArtwork(url: spotify.snapshot.artworkURL, size: slot)
+                    if showsTitle, let title = spotify.snapshot.title {
+                        Text(title).font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.72))
+                            .lineLimit(1).truncationMode(.tail).frame(maxWidth: .infinity)
+                    } else {
+                        Spacer(minLength: 0)
                     }
+                    LevelMeter(tint: artwork.palette?.primary.color ?? .white, paused: reduceMotion).frame(width: slot)
                 }
             }
-            .padding(.horizontal, 20)
-            .frame(width: screen.map(miniIslandWidth) ?? 236, height: screen.map(miniIslandHeight) ?? 24)
+            // Playing or not, the pill keeps the normal width; a long title truncates instead of widening it.
+            .padding(.horizontal, Self.edgePadding + grow)
+            .frame(width: base + 2 * grow, height: height)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(shell.text("open"))
+    }
+}
+
+/// Four soft bars that bounce while music plays.
+private struct LevelMeter: View {
+    let tint: SwiftUI.Color
+    let paused: Bool
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 0.25, paused: paused)) { context in
+            let phase = Int(context.date.timeIntervalSinceReferenceDate * 4)
+            HStack(alignment: .center, spacing: 2.5) {
+                ForEach(0..<4, id: \.self) { index in
+                    Capsule().fill(tint)
+                        .frame(width: 2.5, height: paused ? 8 : CGFloat(5 + ((phase + index * 3) % 4) * 3))
+                        .animation(.easeInOut(duration: 0.22), value: phase)
+                }
+            }.frame(height: 16)
+        }
     }
 }

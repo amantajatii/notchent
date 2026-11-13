@@ -18,7 +18,7 @@ struct IslandReducerTests {
     @Test func explicitOpenStillClosesAndNeverShortensLongUserDelay() {
         var state = IslandState()
         state.settings.closeDelayMilliseconds = 8000
-        #expect(IslandReducer.reduce(state: &state, event: .reveal(.settings)) == [.schedule(.close, token: 1, milliseconds: 8000)])
+        #expect(IslandReducer.reduce(state: &state, event: .reveal(.music)) == [.schedule(.close, token: 1, milliseconds: 8000)])
         _ = IslandReducer.reduce(state: &state, event: .hide)
         #expect(state.mode == .hidden)
         _ = IslandReducer.reduce(state: &state, event: .reveal(.home))
@@ -115,7 +115,7 @@ struct IslandShellRegressionTests {
         #expect(s.mode == .hidden)
     }
     @Test func menuRoutesOutsideScheduleDismissal() {
-        for feature in [IslandFeature.home, .settings] {
+        for feature in [IslandFeature.home, .music] {
             var s = IslandState()
             let effects = IslandReducer.reduce(state: &s, event: .show(feature))
             #expect(effects == [.schedule(.close, token: s.generation, milliseconds: 1000)])
@@ -184,5 +184,36 @@ struct PendingPromptLifetimeTests {
         #expect(state.mode == .prompt)
         _ = IslandReducer.reduce(state: &state, event: .closePrompt)
         #expect(state.mode == .hidden && state.pendingCount == 1)
+    }
+    @Test func pillAtRestKeepsMiniInsteadOfHiding() {
+        var s = IslandState()
+        _ = IslandReducer.reduce(state: &s, event: .pillAtRestChanged(true))
+        #expect(s.mode == .mini)
+        _ = IslandReducer.reduce(state: &s, event: .show(.home))
+        _ = IslandReducer.reduce(state: &s, event: .timer(.close, token: s.generation))
+        #expect(s.mode == .mini)
+        _ = IslandReducer.reduce(state: &s, event: .hide)
+        #expect(s.mode == .mini)
+        #expect(IslandReducer.reduce(state: &s, event: .pointerExited).isEmpty)
+    }
+    @Test func turningPillOffHidesTheRestingPill() {
+        var s = IslandState()
+        _ = IslandReducer.reduce(state: &s, event: .pillAtRestChanged(true))
+        _ = IslandReducer.reduce(state: &s, event: .pillAtRestChanged(false))
+        #expect(s.mode == .hidden)
+    }
+    @Test func pillSettingDoesNotInterruptAnOpenPanel() {
+        var s = IslandState()
+        _ = IslandReducer.reduce(state: &s, event: .show(.music))
+        _ = IslandReducer.reduce(state: &s, event: .pillAtRestChanged(true))
+        #expect(s.mode == .feature(.music))
+        _ = IslandReducer.reduce(state: &s, event: .timer(.close, token: s.generation))
+        #expect(s.mode == .mini)
+    }
+    @Test func completionStillAppearsOverRestingPill() {
+        var s = IslandState()
+        _ = IslandReducer.reduce(state: &s, event: .pillAtRestChanged(true))
+        _ = IslandReducer.reduce(state: &s, event: .agentCompleted)
+        #expect(s.mode == .completion)
     }
 }

@@ -51,7 +51,7 @@ import Testing
         await shell.codexUsage.refresh()
         await shell.claudeUsage.refresh()
         try await render(.home, name: "home", shell: shell, to: directory)
-        for feature in [IslandFeature.agents, .music, .files, .terminal, .settings] {
+        for feature in [IslandFeature.agents, .music, .files, .terminal] {
             try await render(.feature(feature), name: feature.rawValue, shell: shell, to: directory)
         }
         try await render(.drop, name: "drop", shell: shell, to: directory)

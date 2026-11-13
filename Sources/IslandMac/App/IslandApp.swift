@@ -4,7 +4,10 @@ import IslandCore
 
 @MainActor final class IslandShell: ObservableObject {
     @Published var state = IslandState()
-    @Published var presentedMode: IslandMode = .hidden
+    /// Every change replays the content entrance, so the shape moves first and content follows.
+    @Published var presentedMode: IslandMode = .hidden {
+        willSet { if newValue != presentedMode { surface.reveal = ContentReveal.between(presentedMode, newValue, after: surface.reveal) } }
+    }
     let surface = IslandSurfaceState()
     var contentSizeDidChange: ((IslandMode, CGSize) -> Void)?
     @Published var persistenceError: String?
@@ -26,6 +29,7 @@ import IslandCore
     /// Strong ownership of native terminal views survives switching routes and hiding the panel.
     @Published var retainedNativeViews: [IslandFeature: NSView] = [:]
     let spotify = SpotifyStore(client: NativeSpotifyClient())
+    let artwork = ArtworkPaletteStore()
     let files = NativeFileAccess()
     let terminals = TerminalSessionStore()
     let agents = AgentRegistry()
@@ -39,6 +43,7 @@ import IslandCore
         self.localizations = localizations
         settings = (try? store.load()) ?? IslandSettings()
         state.settings = settings
+        artwork.follow(spotify)
     }
     func text(_ key: String) -> String {
         guard let path = localizations.path(forResource: settings.language.rawValue, ofType: "lproj"), let bundle = Bundle(path: path) else { return key }
@@ -49,16 +54,15 @@ import IslandCore
 @main struct IslandApp: App {
     @NSApplicationDelegateAdaptor(IslandAppDelegate.self) var delegate
     var body: some Scene {
-        Settings {
-            SettingsView(shell: delegate.shell, launchAtLogin: delegate.shell.launchAtLogin)
-                .padding(20).preferredColorScheme(.dark)
-        }
+        // Settings open in SettingsWindowController from the menu bar item; this scene is never shown.
+        Settings { EmptyView() }
     }
 }
 
 @MainActor final class IslandAppDelegate: NSObject, NSApplicationDelegate {
     let shell = IslandShell()
     private var controller: IslandPanelController!
+    private lazy var settingsWindow = SettingsWindowController(shell: shell)
     private var statusItem: NSStatusItem!
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -90,14 +94,16 @@ import IslandCore
     }
     private func rebuildMenu() {
         let menu = NSMenu()
-        for (key, action) in [("open", #selector(open)), ("settings", #selector(settings)), ("quit", #selector(quit))] {
-            let item = NSMenuItem(title: shell.text(key), action: action, keyEquivalent: "")
+        for (key, action, shortcut) in [("open", #selector(open), ""), ("settings", #selector(settings), ","), ("quit", #selector(quit), "q")] {
+            let title = key == "settings" ? shell.text(key) + "…" : shell.text(key)
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: shortcut)
             item.target = self; menu.addItem(item)
+            if key == "settings" { menu.addItem(.separator()) }
         }
         statusItem.menu = menu
     }
     @objc private func open() { controller.send(.reveal(.home)) }
-    @objc private func settings() { controller.send(.reveal(.settings)) }
+    @objc private func settings() { settingsWindow.show() }
     @objc private func quit() { NSApp.terminate(nil) }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if shell.terminals.hasRunningOwnedSessions {
