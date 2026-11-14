@@ -1,15 +1,25 @@
 import SwiftUI
 import IslandCore
 
+/// Where the navigation row sits in the hosting view, so the panel controller can test the pointer.
+struct NavigationFrameKey: PreferenceKey {
+    static let defaultValue = CGRect.zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if !next.isEmpty { value = next }
+    }
+}
+
 /// Centred page dots that turn into icons while the pointer is over the top row.
+/// Hover comes from the controller's pointer polling, not SwiftUI's `onHover`: when a terminal takes
+/// focus AppKit replays exit/enter on its tracking areas, which made every icon collapse and bloom again.
 struct IslandNavigation: View {
     static let tabs: [IslandFeature] = [.home, .agents, .music, .files, .terminal]
 
     let selected: IslandFeature
     let title: (IslandFeature) -> String
     let select: (IslandFeature) -> Void
-    @StateObject private var hover = ViewFlag(false)
-    private var hovering: Bool { hover.value }
+    let hovering: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -24,7 +34,7 @@ struct IslandNavigation: View {
         .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.85), value: selected)
         .frame(width: IslandDesign.contentWidth, height: Metrics.rowHeight)
         .contentShape(Rectangle())
-        .onHover { hover.value = $0 }
+        .background(GeometryReader { Color.clear.preference(key: NavigationFrameKey.self, value: $0.frame(in: .global)) })
     }
 
     /// Icons bloom left to right; collapsing back to dots happens together.

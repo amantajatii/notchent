@@ -129,6 +129,7 @@ import QuartzCore
         if focusedTerminal != shell.state.inputActive { send(.inputChanged(focusedTerminal)) }
         let point = NSEvent.mouseLocation
         if panel.isVisible { updateMousePassThrough() }
+        updateNavigationHover(point)
         let trigger = PanelGeometry.triggerRect(screen: screen.frame, menuBarHeight: max(24, screen.safeAreaInsets.top, NSStatusBar.system.thickness))
         let mouseDown = NSEvent.pressedMouseButtons & 1 != 0
         let dragBoard = NSPasteboard(name: .drag)
@@ -138,6 +139,17 @@ import QuartzCore
         setDragHot(draggingFile)
         let next = hoveringDropArea
         if next != inside { inside = next; send(next ? .pointerEntered : .pointerExited) }
+    }
+    /// Hover over the page dots, tested against the row's laid-out frame; stable across focus changes.
+    private func updateNavigationHover(_ point: CGPoint) {
+        var hovered = false
+        if panel.isVisible, !closing, !shell.navigationFrame.isEmpty {
+            let inWindow = panel.convertPoint(fromScreen: point)
+            var local = host.convert(inWindow, from: nil)
+            if !host.isFlipped { local.y = host.bounds.height - local.y }
+            hovered = shell.navigationFrame.contains(local)
+        }
+        if hovered != shell.navigationHovered { shell.navigationHovered = hovered }
     }
     /// The resting pill follows the setting and the screen's notch. Full-screen state is deliberately
     /// ignored: without Screen Recording it reads as "full screen" all the time and would hide the pill.
@@ -312,6 +324,7 @@ struct IslandRootView: View {
                 Color.clear.preference(key: IslandContentSize.self, value: IslandMeasurement(mode: mode, size: geometry.size))
             })
             .onPreferenceChange(IslandContentSize.self) { measurement in shell.contentSizeDidChange?(measurement.mode, measurement.size) }
+            .onPreferenceChange(NavigationFrameKey.self) { shell.navigationFrame = $0 }
         }
         .foregroundStyle(.white)
         .environment(\.locale, Locale(identifier: shell.settings.language.rawValue))
@@ -322,7 +335,8 @@ struct IslandRootView: View {
         return .home
     }
     private var navigation: some View {
-        IslandNavigation(selected: selectedFeature, title: { shell.text($0.rawValue) }) { shell.dispatch?(.show($0)) }
+        IslandNavigation(selected: selectedFeature, title: { shell.text($0.rawValue) },
+                         select: { shell.dispatch?(.show($0)) }, hovering: shell.navigationHovered)
     }
     @ViewBuilder private var content: some View {
         let feature = selectedFeature

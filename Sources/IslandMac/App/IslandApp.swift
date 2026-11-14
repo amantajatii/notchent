@@ -30,6 +30,10 @@ import IslandCore
     @Published var retainedNativeViews: [IslandFeature: NSView] = [:]
     let spotify = SpotifyStore(client: NativeSpotifyClient())
     let artwork = ArtworkPaletteStore()
+    /// The pointer is over the navigation row; set by the panel controller's pointer polling.
+    @Published var navigationHovered = false
+    /// The navigation row's frame in the hosting view (top-left origin); empty when it is not shown.
+    var navigationFrame: CGRect = .zero
     let files = NativeFileAccess()
     let terminals = TerminalSessionStore()
     let agents = AgentRegistry()
